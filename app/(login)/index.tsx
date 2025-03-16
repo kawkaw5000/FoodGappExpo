@@ -28,7 +28,7 @@ export default function LoginScreen() {
       <View style={{ gap: 10, position: "relative", top: -70, width: 250 }}>
         <CustomButton
           title="Login"
-          onPress={() => router.replace("/(login)/loginScreen")}  // ✅ Correct path
+          onPress={() => router.replace("/(login)/loginScreen")}
           backgroundColor="#FCB647"
           textColor="white"
         />
