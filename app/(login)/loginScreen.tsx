@@ -1,14 +1,52 @@
-import { View, Text, Button, Image, TextInput } from "react-native";
+import { View, Text, Button, Image, TextInput, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from "react";
 import CustomButton from "@/components/buttons/CustomButton";
+import { Ionicons } from '@expo/vector-icons';
+import axios, { AxiosError, AxiosResponse } from "axios";
+import Config from "@/constants/Config";
+interface LoginResponse {
+  message?: string;
+  error?: any;
+}
+
+const Account_API = Config.Account_API;
+const loginUrl = `${Account_API}/login`
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
+  const handleLogin = async () => {
+    try {
+      if (!email.trim() || !password.trim()) {
+        window.alert("Email and password are required.");
+        setError("Email and password are required.");
+        return;
+      }
+
+      const response: AxiosResponse<LoginResponse> = await axios.post(
+        loginUrl,
+        { email: email, password: password },
+        { headers: { "Content-Type": "application/json" } }
+      );  
+      window.alert(response.data.message);
+    } catch (err) {
+      const error = err as AxiosError<LoginResponse>;
+      if (error.response) {
+        window.alert(error.response.data?.error)
+        setError(error.response.data?.error);
+      } else {
+        console.error("Unexpected error:", (err as Error).message);
+        setError("An unexpected error occurred.");
+      }
+    }
+  };
+  
   return (
     <SafeAreaView style={{ flex: 1, justifyContent: "flex-start", alignItems: "center", backgroundColor: "white",}}>
       <View>
@@ -36,29 +74,44 @@ export default function LoginScreen() {
             <Text style={{fontSize: 20, fontWeight: "bold"}}>Email</Text>
           </View>
         </View> 
-        <View style={{gap:20, width: 250, position: "relative"}}>
-          <TextInput
-            style={{
-              height: 50,
-              borderColor: "black",
-              borderWidth: 1,
-              paddingHorizontal: 10,
-              borderRadius: 5,
-              width: 300,
-            }}
-            placeholder=""
-            value={password}
-            onChangeText={setPassword}
-          />
-          <View style={{position: "absolute", top:-30}}>
-            <Text style={{fontSize: 20, fontWeight: "bold"}}>Password</Text>
-          </View>
-        </View>     
+        <View style={{ gap: 20, width: 250, position: 'relative' }}>
+            {/* Password Input */}
+            <TextInput
+              style={{
+                  height: 50,
+                  borderColor: 'black',
+                  borderWidth: 1,
+                  paddingHorizontal: 10,
+                  borderRadius: 5,
+                  width: 300,
+              }}
+              placeholder=""
+              value={password}
+              secureTextEntry={!isPasswordVisible} 
+              onChangeText={setPassword}
+            />
+            <View style={{ position: 'absolute', top: -30 }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Password</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+              style={{
+                position: 'absolute',
+                right: -34,
+                top: 12,
+              }}>
+              <Ionicons
+                name={isPasswordVisible ? 'eye-off' : 'eye'}
+                size={24}
+                color="gray"
+              />
+            </TouchableOpacity>
+        </View>    
       </View>
       <View style={{ gap: 20, position: "relative", width: 300, top: 80 }}>
         <CustomButton
           title="Login"
-          onPress={() => alert("Sign In Pressed")}
+          onPress={() => handleLogin()}
           backgroundColor="#FCB647"
           textColor="white"  
         />
@@ -73,12 +126,6 @@ export default function LoginScreen() {
         />
         </View> 
       </View>
-      {/* <Button
-        title="Logout"
-        onPress={() => {
-            router.push("/(login)");
-        }}
-      /> */}
     </SafeAreaView>
   );
 }
