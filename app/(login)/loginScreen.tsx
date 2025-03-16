@@ -1,4 +1,4 @@
-import { View, Text, Button, Image, TextInput, TouchableOpacity } from "react-native";
+import { View, Text, Button, Image, TextInput, TouchableOpacity, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from "react";
@@ -6,10 +6,6 @@ import CustomButton from "@/components/buttons/CustomButton";
 import { Ionicons } from '@expo/vector-icons';
 import axios, { AxiosError, AxiosResponse } from "axios";
 import Config from "@/constants/Config";
-interface LoginResponse {
-  message?: string;
-  error?: any;
-}
 
 const Account_API = Config.Account_API;
 const loginUrl = `${Account_API}/login`
@@ -24,7 +20,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     try {
       if (!email.trim() || !password.trim()) {
-        window.alert("Email and password are required.");
+        Alert.alert("Email and password are required.");
         setError("Email and password are required.");
         return;
       }
@@ -34,11 +30,14 @@ export default function LoginScreen() {
         { email: email, password: password },
         { headers: { "Content-Type": "application/json" } }
       );  
-      window.alert(response.data.message);
+
+      Alert.alert(response.data.message!);
+      console.log("Login successful", `Status: ${response.status}\nMessage: ${response.data?.message}`);
+      
     } catch (err) {
       const error = err as AxiosError<LoginResponse>;
       if (error.response) {
-        window.alert(error.response.data?.error)
+        Alert.alert(error.response.data?.error)
         setError(error.response.data?.error);
       } else {
         console.error("Unexpected error:", (err as Error).message);
