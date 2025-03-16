@@ -30,9 +30,10 @@ export default function LoginScreen() {
         { email: email, password: password },
         { headers: { "Content-Type": "application/json" } }
       );  
+      const { message, roleName } = response.data;
 
       Alert.alert(response.data.message!);
-      console.log("Login successful", `Status: ${response.status}\nMessage: ${response.data?.message}`);
+      console.log("Login successful", `Role: ${roleName}`);
       
     } catch (err) {
       const error = err as AxiosError<LoginResponse>;
