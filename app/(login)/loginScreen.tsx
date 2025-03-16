@@ -6,6 +6,7 @@ import CustomButton from "@/components/buttons/CustomButton";
 import { Ionicons } from '@expo/vector-icons';
 import axios, { AxiosError, AxiosResponse } from "axios";
 import Config from "@/constants/Config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Account_API = Config.Account_API;
 const loginUrl = `${Account_API}/login`
@@ -34,6 +35,10 @@ export default function LoginScreen() {
 
       Alert.alert(response.data.message!);
       console.log("Login successful", `Role: ${roleName}`);
+      
+      if (roleName == "User") {
+        router.replace("/(home)")
+      }
       
     } catch (err) {
       const error = err as AxiosError<LoginResponse>;
