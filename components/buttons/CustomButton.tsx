@@ -20,12 +20,10 @@ export default function CustomButton({ title, onPress, backgroundColor = "#6200e
 
 const styles = StyleSheet.create({
   button: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
     borderRadius: 10,
     alignItems: "center",
     width: "auto",
-    height: 50,
+    padding: 15,
   },
   buttonText: {
     fontSize: 16,

@@ -1,4 +1,4 @@
-import { View, Text, Button, Image, TextInput, TouchableOpacity, Alert } from "react-native";
+import { View, Text, Button, Image, TextInput, TouchableOpacity, Alert, Dimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from "react";
@@ -16,7 +16,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-
+  const { width } = Dimensions.get("window");
   const handleLogin = async () => {
     try {
       if (!email.trim() || !password.trim()) {
@@ -49,13 +49,17 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={{ flex: 1, justifyContent: "flex-start", alignItems: "center", backgroundColor: "white",}}>
       <View>
-        <Image
-          source={require("../../assets/images/foodGapp.png")}
-          style={{ width: 290, height: 290, resizeMode: "contain" }}
-        />
-      </View>
-      <View style={{gap:50, width: 300, position: "relative"}}>
-        <View style={{gap:20, width: 250, position: "relative"}}>
+      <Image
+        source={require("../../assets/images/foodGapp.png")}
+        style={{
+          width: width * 0.81,
+          height: width * 0.81,
+          resizeMode: "contain",
+        }}
+      />
+    </View>
+      <View style={{gap:50, width: "90%", position: "relative"}}>
+        <View style={{gap:20, width: "100%", position: "relative"}}>
           <TextInput
             style={{
               height: 50,
@@ -63,17 +67,17 @@ export default function LoginScreen() {
               borderWidth: 1,
               paddingHorizontal: 10,
               borderRadius: 5,
-              width: 300,
+              width: "100%",
             }}
             placeholder=""
             value={email}
             onChangeText={setEmail}
           />
-          <View style={{position: "absolute", top:-30}}>
+          <View style={{position: "absolute", top:-35}}>
             <Text style={{fontSize: 20, fontWeight: "bold"}}>Email</Text>
           </View>
         </View> 
-        <View style={{ gap: 20, width: 250, position: 'relative' }}>
+        <View style={{ gap: 20, width: "100%", position: 'relative' }}>
             {/* Password Input */}
             <TextInput
               style={{
@@ -82,21 +86,21 @@ export default function LoginScreen() {
                   borderWidth: 1,
                   paddingHorizontal: 10,
                   borderRadius: 5,
-                  width: 300,
+                  width: "100%",
               }}
               placeholder=""
               value={password}
               secureTextEntry={!isPasswordVisible} 
               onChangeText={setPassword}
             />
-            <View style={{ position: 'absolute', top: -30 }}>
+            <View style={{ position: 'absolute', top: -35 }}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Password</Text>
             </View>
             <TouchableOpacity
               onPress={() => setIsPasswordVisible(!isPasswordVisible)}
               style={{
                 position: 'absolute',
-                right: -34,
+                right: 10,
                 top: 12,
               }}>
               <Ionicons
@@ -107,7 +111,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
         </View>    
       </View>
-      <View style={{ gap: 20, position: "relative", width: 300, top: 80 }}>
+      <View style={{ gap: 20, position: "relative", width: "90%", top: 80 }}>
         <CustomButton
           title="Login"
           onPress={() => handleLogin()}
