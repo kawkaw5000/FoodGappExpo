@@ -10,9 +10,9 @@ export default function RootLayout() {
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       <Stack>
-        {/* Show the login screen first */}
         <Stack.Screen name="(login)" options={{ headerShown: false }} />
         <Stack.Screen name="(home)" options={{ headerShown: false }} />
+        <Stack.Screen name="(register)" options={{ headerShown: false }} />
       </Stack>
     </>
   );
