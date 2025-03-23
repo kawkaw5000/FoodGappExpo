@@ -11,7 +11,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const Account_API = Config.Account_API;
 const loginUrl = `${Account_API}/login`
 
-export default function LoginScreen() {
+export default function RegisterScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
