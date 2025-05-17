@@ -34,6 +34,12 @@ export default function HomeScreen() {
         THIS IS HOME TEST
         </Text>
       </View>
+      <CustomButton
+        title="Login"
+        onPress={() => router.replace("/(login)/loginScreen")}
+        backgroundColor="#FCB647"
+        textColor="white"
+      />
     </SafeAreaView>
   );
 }
