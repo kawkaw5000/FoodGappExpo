@@ -1,7 +1,6 @@
-import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity } from "react-native";
+import { View, Text, SafeAreaView, StyleSheet, Image, TouchableOpacity } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
-import { useCallback } from "react";
 
 const dashboardIcons = [
   { name: "Log", icon: require("../../assets/images/Dashboard Icons/Food_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Food_Highlight.png"), route: "/(log)" },
@@ -11,24 +10,19 @@ const dashboardIcons = [
   { name: "Profile", icon: require("../../assets/images/Dashboard Icons/Profile_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Profile_Highlight.png"), route: "/(profile)" },
 ];
 
-export default function HomeScreen() {
+export default function ProfilePage() {
   const router = useRouter();
-  const handleLogout = useCallback(() => {
-    router.replace("/(login)/loginScreen");
-  }, [router]);
-
-  // Determine which icon is highlighted
-  const currentRoute = "/(home)";
+  const currentRoute = "/(profile)";
 
   const handleNav = (route: string) => {
-    if (route !== currentRoute) router.replace(route as any);
+    if (route !== currentRoute) router.replace({ pathname: route as any });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.centered}>
-        <Image source={require("../../assets/images/Dashboard Icons/Home_Highlight.png")} style={styles.image} />
-        <Text style={styles.title}>Welcome to the Main Dashboard!</Text>
+        <Image source={require("../../assets/images/Dashboard Icons/Profile_Highlight.png")} style={styles.image} />
+        <Text style={styles.title}>This is the Profile page</Text>
         <CustomButton
           title="Get Started"
           onPress={() => {/* Add your logic here */}}
@@ -37,7 +31,7 @@ export default function HomeScreen() {
         />
         <CustomButton
           title="Edit Profile"
-          onPress={() => router.push({ pathname: "/(profile)/editProfile" })}
+          onPress={() => router.push("/(profile)/editProfile")}
           backgroundColor="#333"
           textColor="white"
         />
@@ -51,42 +45,16 @@ export default function HomeScreen() {
           </TouchableOpacity>
         ))}
       </View>
-      <CustomButton
-        title="Logout"
-        onPress={handleLogout}
-        backgroundColor="#FCB647"
-        textColor="white"
-      />
-      <View style={{ height: 12 }} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  image: {
-    width: 120,
-    height: 120,
-    resizeMode: "contain",
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "#333",
-  },
-  spacer: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center", gap: 20 },
+  image: { width: 120, height: 120, resizeMode: "contain", marginBottom: 20 },
+  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20, color: "#333" },
+  spacer: { flex: 1 },
   bottomBar: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -97,22 +65,8 @@ const styles = StyleSheet.create({
     borderTopColor: "#eee",
     backgroundColor: "#fff",
   },
-  iconButton: {
-    alignItems: "center",
-    flex: 1,
-  },
-  icon: {
-    width: 32,
-    height: 32,
-    resizeMode: "contain",
-    marginBottom: 2,
-  },
-  iconLabel: {
-    fontSize: 12,
-    color: "#333",
-  },
-  iconLabelActive: {
-    color: "#FCB647",
-    fontWeight: "bold",
-  },
+  iconButton: { alignItems: "center", flex: 1 },
+  icon: { width: 32, height: 32, resizeMode: "contain", marginBottom: 2 },
+  iconLabel: { fontSize: 12, color: "#333" },
+  iconLabelActive: { color: "#FCB647", fontWeight: "bold" },
 });

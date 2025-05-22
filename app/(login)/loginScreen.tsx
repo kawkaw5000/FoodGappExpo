@@ -37,7 +37,7 @@ export default function LoginScreen() {
       console.log("Login successful", `Role: ${roleName}`);
       
       if (roleName == "User") {
-        router.replace("/(home)")
+        router.replace("../(home)")
       }
       
     } catch (err) {
@@ -129,7 +129,7 @@ export default function LoginScreen() {
         <View style={{}}>
         <CustomButton
           title="Create an account"
-          onPress={() => router.replace("/(register)")}
+          onPress={() => router.replace("../(register)")}
           backgroundColor="#59E74E"
           textColor="white"  
         />

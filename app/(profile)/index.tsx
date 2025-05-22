@@ -11,38 +11,31 @@ const dashboardIcons = [
   { name: "Profile", icon: require("../../assets/images/Dashboard Icons/Profile_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Profile_Highlight.png"), route: "/(profile)" },
 ];
 
-export default function HomeScreen() {
+export default function ProfileScreen() {
   const router = useRouter();
   const handleLogout = useCallback(() => {
     router.replace("/(login)/loginScreen");
   }, [router]);
 
-  // Determine which icon is highlighted
-  const currentRoute = "/(home)";
+  const currentRoute = "/(profile)";
 
   const handleNav = (route: string) => {
-    if (route !== currentRoute) router.replace(route as any);
+    if (route !== currentRoute) router.replace({ pathname: route as any });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.centered}>
-        <Image source={require("../../assets/images/Dashboard Icons/Home_Highlight.png")} style={styles.image} />
-        <Text style={styles.title}>Welcome to the Main Dashboard!</Text>
-        <CustomButton
-          title="Get Started"
-          onPress={() => {/* Add your logic here */}}
-          backgroundColor="#FCB647"
-          textColor="white"
-        />
+        <Image source={require("../../assets/images/Dashboard Icons/Profile_Highlight.png")} style={styles.image} />
+        <Text style={styles.title}>This is the Profile page</Text>
         <CustomButton
           title="Edit Profile"
-          onPress={() => router.push({ pathname: "/(profile)/editProfile" })}
+          onPress={() => router.push("../profile/editProfile")}
           backgroundColor="#333"
           textColor="white"
         />
+        <View style={styles.spacer} />
       </View>
-      <View style={styles.spacer} />
       <View style={styles.bottomBar}>
         {dashboardIcons.map((item) => (
           <TouchableOpacity key={item.name} style={styles.iconButton} onPress={() => handleNav(item.route)}>
@@ -58,6 +51,7 @@ export default function HomeScreen() {
         textColor="white"
       />
       <View style={{ height: 12 }} />
+      <View style={{ height: 16 }} />
     </SafeAreaView>
   );
 }
