@@ -2,21 +2,8 @@ import { View, Text, SafeAreaView, StyleSheet, Image, TouchableOpacity } from "r
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
 
-const dashboardIcons = [
-  { name: "Log", icon: require("../../assets/images/Dashboard Icons/Food_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Food_Highlight.png"), route: "/(log)" },
-  { name: "Track", icon: require("../../assets/images/Dashboard Icons/Track_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Track_Highlight.png"), route: "/(track)" },
-  { name: "Home", icon: require("../../assets/images/Dashboard Icons/Home_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Home_Highlight.png"), route: "/(home)" },
-  { name: "Scan", icon: require("../../assets/images/Dashboard Icons/Scan_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Scan_Highlight.png"), route: "/(scan)" },
-  { name: "Profile", icon: require("../../assets/images/Dashboard Icons/Profile_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Profile_Highlight.png"), route: "/(profile)" },
-];
-
 export default function ProfilePage() {
   const router = useRouter();
-  const currentRoute = "/(profile)";
-
-  const handleNav = (route: string) => {
-    if (route !== currentRoute) router.replace({ pathname: route as any });
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -36,15 +23,8 @@ export default function ProfilePage() {
           textColor="white"
         />
       </View>
+      app/(track)/index.tsx
       <View style={styles.spacer} />
-      <View style={styles.bottomBar}>
-        {dashboardIcons.map((item) => (
-          <TouchableOpacity key={item.name} style={styles.iconButton} onPress={() => handleNav(item.route)}>
-            <Image source={item.route === currentRoute ? item.highlight : item.icon} style={styles.icon} />
-            <Text style={[styles.iconLabel, item.route === currentRoute && styles.iconLabelActive]}>{item.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
     </SafeAreaView>
   );
 }

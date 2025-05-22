@@ -9,12 +9,6 @@ export default function ProfileScreen() {
     router.replace("/(login)/loginScreen");
   }, [router]);
 
-  const currentRoute = "/(profile)";
-
-  const handleNav = (route: string) => {
-    if (route !== currentRoute) router.replace({ pathname: route as any });
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.centered}>
@@ -30,6 +24,12 @@ export default function ProfileScreen() {
       </View>
       <View style={{ height: 12 }} />
       <View style={{ height: 16 }} />
+      <CustomButton
+        title="Logout"
+        onPress={handleLogout}
+        backgroundColor="#FCB647"
+        textColor="white"
+      />
     </SafeAreaView>
   );
 }

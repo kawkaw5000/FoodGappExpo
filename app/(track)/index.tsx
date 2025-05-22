@@ -3,19 +3,8 @@ import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
 import { useCallback } from "react";
 
-const dashboardIcons = [
-  { name: "Log", icon: require("../../assets/images/Dashboard Icons/Food_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Food_Highlight.png"), route: "/(log)" },
-  { name: "Track", icon: require("../../assets/images/Dashboard Icons/Track_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Track_Highlight.png"), route: "/(track)" },
-  { name: "Home", icon: require("../../assets/images/Dashboard Icons/Home_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Home_Highlight.png"), route: "/(home)" },
-  { name: "Scan", icon: require("../../assets/images/Dashboard Icons/Scan_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Scan_Highlight.png"), route: "/(scan)" },
-  { name: "Profile", icon: require("../../assets/images/Dashboard Icons/Profile_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Profile_Highlight.png"), route: "/(profile)" },
-];
-
 export default function TrackPage() {
   const router = useRouter();
-  const handleLogout = useCallback(() => {
-    router.replace("/(login)/loginScreen");
-  }, [router]);
 
   const currentRoute = "/(track)";
 
@@ -30,13 +19,6 @@ export default function TrackPage() {
         <Text style={styles.title}>This is the Track page</Text>
       </View>
       <View style={styles.spacer} />
-      
-      <CustomButton
-        title="Logout"
-        onPress={handleLogout}
-        backgroundColor="#FCB647"
-        textColor="white"
-      />
     </SafeAreaView>
   );
 }
