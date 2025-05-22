@@ -145,7 +145,7 @@ export default function RegisterScreen() {
             <View>
               <CustomButton
                 title="Confirm"
-                onPress={() => router.replace("/(register)")}
+                onPress={() => router.replace("/(register)/registerMainScreen")}
                 backgroundColor="#FCB647"
                 textColor="white"  
               />
