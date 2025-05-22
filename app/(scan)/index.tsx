@@ -11,14 +11,13 @@ const dashboardIcons = [
   { name: "Profile", icon: require("../../assets/images/Dashboard Icons/Profile_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Profile_Highlight.png"), route: "/(profile)" },
 ];
 
-export default function HomeScreen() {
+export default function ScanScreen() {
   const router = useRouter();
   const handleLogout = useCallback(() => {
     router.replace("/(login)/loginScreen");
   }, [router]);
 
-  // Determine which icon is highlighted
-  const currentRoute = "/(home)";
+  const currentRoute = "/(scan)";
 
   const handleNav = (route: string) => {
     if (route !== currentRoute) router.replace({ pathname: route as any });
@@ -27,20 +26,8 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.centered}>
-        <Image source={require("../../assets/images/Dashboard Icons/Home_Highlight.png")} style={styles.image} />
-        <Text style={styles.title}>Welcome to the Main Dashboard!</Text>
-        <CustomButton
-          title="Get Started"
-          onPress={() => {/* Add your logic here */}}
-          backgroundColor="#FCB647"
-          textColor="white"
-        />
-        <CustomButton
-          title="Edit Profile"
-          onPress={() => router.push({ pathname: "/(profile)/editProfile" })}
-          backgroundColor="#333"
-          textColor="white"
-        />
+        <Image source={require("../../assets/images/Dashboard Icons/Scan_Highlight.png")} style={styles.image} />
+        <Text style={styles.title}>This is the Scan page</Text>
       </View>
       <View style={styles.spacer} />
       <View style={styles.bottomBar}>
@@ -57,7 +44,6 @@ export default function HomeScreen() {
         backgroundColor="#FCB647"
         textColor="white"
       />
-      <View style={{ height: 12 }} />
     </SafeAreaView>
   );
 }
