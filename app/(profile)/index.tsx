@@ -30,7 +30,7 @@ export default function ProfileScreen() {
         <Text style={styles.title}>This is the Profile page</Text>
         <CustomButton
           title="Edit Profile"
-          onPress={() => router.push({ pathname: "/(profile)/editProfile" })}
+          onPress={() => router.push("../profile/editProfile")}
           backgroundColor="#333"
           textColor="white"
         />

@@ -21,7 +21,7 @@ export default function HomeScreen() {
   const currentRoute = "/(home)";
 
   const handleNav = (route: string) => {
-    if (route !== currentRoute) router.replace({ pathname: route as any });
+    if (route !== currentRoute) router.replace(route as any);
   };
 
   return (
