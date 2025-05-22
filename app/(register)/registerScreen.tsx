@@ -164,7 +164,7 @@ export default function RegisterScreen() {
                 shadowOpacity: 0.2,
                 shadowRadius: 3,
               }}
-              onPress={() => router.replace("/(register)")}
+              onPress={() => router.replace("/(register)/registerMainScreen")}
             >
               <MaterialIcons name="arrow-back" size={54} color="white" />
             </TouchableOpacity>
