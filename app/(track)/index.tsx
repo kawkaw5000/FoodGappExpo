@@ -30,14 +30,7 @@ export default function TrackPage() {
         <Text style={styles.title}>This is the Track page</Text>
       </View>
       <View style={styles.spacer} />
-      <View style={styles.bottomBar}>
-        {dashboardIcons.map((item) => (
-          <TouchableOpacity key={item.name} style={styles.iconButton} onPress={() => handleNav(item.route)}>
-            <Image source={item.route === currentRoute ? item.highlight : item.icon} style={styles.icon} />
-            <Text style={[styles.iconLabel, item.route === currentRoute && styles.iconLabelActive]}>{item.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      
       <CustomButton
         title="Logout"
         onPress={handleLogout}
