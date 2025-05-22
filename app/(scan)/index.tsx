@@ -5,10 +5,7 @@ import { useCallback } from "react";
 
 export default function ScanScreen() {
   const router = useRouter();
-  const handleLogout = useCallback(() => {
-    router.replace("/(login)/loginScreen");
-  }, [router]);
-
+  
   const currentRoute = "/(scan)";
 
   const handleNav = (route: string) => {

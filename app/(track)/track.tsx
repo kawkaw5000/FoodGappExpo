@@ -2,7 +2,7 @@ import { View, Text, SafeAreaView, StyleSheet } from "react-native";
 export default function TrackPage() {
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.text}>This is the Track page</Text>
+      <Text style={styles.text}>This is the Track pagesdsd</Text>
     </SafeAreaView>
   );
 }

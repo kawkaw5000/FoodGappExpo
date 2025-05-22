@@ -5,9 +5,6 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NavImg } from "@/constants/NavImg";
 import BottomNavBar from "@/components/NavigationBar";
 
-
-const { width } = Dimensions.get("window");
-
 export default function RootLayout() {
   const pathname = usePathname(); 
 
@@ -17,10 +14,6 @@ export default function RootLayout() {
     console.log(pathname)
   })
   const router = useRouter();
-    const handleLogout = useCallback(() => {
-      router.replace("/(login)/loginScreen");
-    }, [router]);
-  
     const currentRoute = "/(login)/loginScreen";
   
     const handleNav = (route: string) => {
