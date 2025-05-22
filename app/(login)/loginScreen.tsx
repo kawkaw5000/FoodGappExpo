@@ -129,7 +129,7 @@ export default function LoginScreen() {
         <View style={{}}>
         <CustomButton
           title="Create an account"
-          onPress={() => router.replace("../(register)")}
+          onPress={() => router.replace("../(register)/registerMainScreen")}
           backgroundColor="#59E74E"
           textColor="white"  
         />

@@ -2,20 +2,15 @@ import { Stack, useNavigationContainerRef, usePathname, useRouter } from "expo-r
 import { useCallback, useEffect } from "react";
 import { StatusBar, View, Image, TouchableOpacity, Dimensions, StyleSheet, Text } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { NavImg } from "@/constants/NavImg";
 
-const dashboardIcons = [
-  { name: "Log", icon: require("../assets/images/Dashboard Icons/Food_Nohighlight.png"), highlight: require("../assets/images/Dashboard Icons/Food_Highlight.png"), route: "/(log)" },
-  { name: "Track", icon: require("../assets/images/Dashboard Icons/Track_Nohighlight.png"), highlight: require("../assets/images/Dashboard Icons/Track_Highlight.png"), route: "/(track)" },
-  { name: "Home", icon: require("../assets/images/Dashboard Icons/Home_Nohighlight.png"), highlight: require("../assets/images/Dashboard Icons/Home_Highlight.png"), route: "/(home)" },
-  { name: "Scan", icon: require("../assets/images/Dashboard Icons/Scan_Nohighlight.png"), highlight: require("../assets/images/Dashboard Icons/Scan_Highlight.png"), route: "/(scan)" },
-  { name: "Profile", icon: require("../assets/images/Dashboard Icons/Profile_Nohighlight.png"), highlight: require("../assets/images/Dashboard Icons/Profile_Highlight.png"), route: "/(profile)" },
-];
+
 const { width } = Dimensions.get("window");
 
 export default function RootLayout() {
   const pathname = usePathname(); 
 
-  const hideBottomNav = pathname === "/loginScreen" || pathname === "/registerScreen";
+  const hideBottomNav = pathname === "/loginScreen" || pathname === "/registerScreen" || pathname === "/registerMainScreen";
   useEffect(() => {
     console.log(hideBottomNav)
     console.log(pathname)
@@ -25,7 +20,6 @@ export default function RootLayout() {
       router.replace("/(login)/loginScreen");
     }, [router]);
   
-    // Determine which icon is highlighted
     const currentRoute = "/(login)/loginScreen";
   
     const handleNav = (route: string) => {
@@ -49,7 +43,7 @@ export default function RootLayout() {
       {/* Global Bottom Nav - only show on main screens */}
       {!hideBottomNav && (
         <View style={styles.bottomBar}>
-          {dashboardIcons.map((item) => (
+          {NavImg().map((item) => (
             <TouchableOpacity key={item.name} style={styles.iconButton} onPress={() => handleNav(item.route)}>
               <Image source={item.route === currentRoute ? item.highlight : item.icon} style={styles.icon} />
               <Text style={[styles.iconLabel, item.route === currentRoute && styles.iconLabelActive]}>{item.name}</Text>
