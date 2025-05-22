@@ -69,8 +69,8 @@ const styles = StyleSheet.create({
     marginLeft: "10%",
   },
   radialMenu: {
-    flexDirection: "row",
-    justifyContent: "center",
+    flexDirection: "column",
+    alignItems: "center",
     marginBottom: 24,
     gap: 10,
   },
@@ -80,8 +80,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    marginHorizontal: 5,
+    marginVertical: 5,
     backgroundColor: "#fff",
+    width: 180,
+    alignItems: "center",
   },
   radialButtonActive: {
     backgroundColor: "#FCB647",

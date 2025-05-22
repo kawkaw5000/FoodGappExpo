@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -9,11 +9,30 @@ export default function ProfileScreen() {
     router.replace("/(login)/loginScreen");
   }, [router]);
 
+  // Example user profile state (replace with real data or context as needed)
+  const [profile, setProfile] = useState({
+    firstName: "John",
+    lastName: "Doe",
+    age: 25,
+    weight: 70,
+    height: 175,
+    bodyGoal: "Maintain Weight",
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.centered}>
         <Image source={require("../../assets/images/Dashboard Icons/Profile_Highlight.png")} style={styles.image} />
         <Text style={styles.title}>This is the Profile page</Text>
+        {/* Profile Info Display */}
+        <View style={styles.profileInfoBox}>
+          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>First Name:</Text> {profile.firstName}</Text>
+          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Last Name:</Text> {profile.lastName}</Text>
+          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Age:</Text> {profile.age}</Text>
+          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Weight:</Text> {profile.weight} kg</Text>
+          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Height:</Text> {profile.height} cm</Text>
+          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Body Goal:</Text> {profile.bodyGoal}</Text>
+        </View>
         <CustomButton
           title="Edit Profile"
           onPress={() => router.push("../profile/editProfile")}
@@ -86,5 +105,27 @@ const styles = StyleSheet.create({
   iconLabelActive: {
     color: "#FCB647",
     fontWeight: "bold",
+  },
+  profileInfoBox: {
+    width: '90%',
+    backgroundColor: '#F7F7F7',
+    borderRadius: 12,
+    padding: 18,
+    marginBottom: 18,
+    alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  profileInfo: {
+    fontSize: 16,
+    marginBottom: 6,
+    color: '#333',
+  },
+  profileLabel: {
+    fontWeight: 'bold',
+    color: '#222',
   },
 });

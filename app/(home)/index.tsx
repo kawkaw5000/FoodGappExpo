@@ -1,7 +1,8 @@
 import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import GetStarted from "./getStarted";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -16,17 +17,49 @@ export default function HomeScreen() {
     if (route !== currentRoute) router.replace(route as any);
   };
 
+  const [getStartedStep, setGetStartedStep] = useState(0);
+  const [showGetStarted, setShowGetStarted] = useState(false);
+
+  // Example steps for Get Started (replace with your actual content/icons)
+  const getStartedSteps = [
+    {
+      title: "Set Your Goal",
+      description: "Choose your body goal to personalize your experience.",
+      icon: require("../../assets/images/GetStarted Icons/TargetLogo.png"),
+    },
+    {
+      title: "Enter Your Weight",
+      description: "Track your weight for better recommendations.",
+      icon: require("../../assets/images/GetStarted Icons/WeightLogo.png"),
+    },
+    {
+      title: "Enter Your Height",
+      description: "Height helps us calculate your BMI.",
+      icon: require("../../assets/images/GetStarted Icons/HeightLogo.png"),
+    },
+    {
+      title: "Start Exercising",
+      description: "Add your exercise routines to get started!",
+      icon: require("../../assets/images/GetStarted Icons/ExerciseLogo.png"),
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.centered}>
         <Image source={require("../../assets/images/Dashboard Icons/Home_Highlight.png")} style={styles.image} />
         <Text style={styles.title}>Welcome to the Main Dashboard!</Text>
-        <CustomButton
-          title="Get Started"
-          onPress={() => {/* Add your logic here */}}
-          backgroundColor="#FCB647"
-          textColor="white"
-        />
+        {/* Get Started Stepper */}
+        {showGetStarted ? (
+          <GetStarted onFinish={() => { setShowGetStarted(false); }} />
+        ) : (
+          <CustomButton
+            title="Get Started"
+            onPress={() => setShowGetStarted(true)}
+            backgroundColor="#FCB647"
+            textColor="white"
+          />
+        )}
         <CustomButton
           title="Edit Profile"
           onPress={() => router.push({ pathname: "/(profile)/editProfile" })}
@@ -98,5 +131,42 @@ const styles = StyleSheet.create({
   iconLabelActive: {
     color: "#FCB647",
     fontWeight: "bold",
+  },
+  getStartedBox: {
+    width: '90%',
+    backgroundColor: '#F7F7F7',
+    borderRadius: 12,
+    padding: 18,
+    marginBottom: 18,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  getStartedIcon: {
+    width: 64,
+    height: 64,
+    resizeMode: 'contain',
+    marginBottom: 10,
+  },
+  getStartedTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 6,
+    color: '#333',
+  },
+  getStartedDesc: {
+    fontSize: 15,
+    color: '#666',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  getStartedNavRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12,
   },
 });
