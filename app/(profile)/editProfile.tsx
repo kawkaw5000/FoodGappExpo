@@ -1,7 +1,7 @@
-import { View, Text, TextInput, SafeAreaView, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, TextInput, SafeAreaView, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const bodyGoals = [
   { id: 1, label: "Lose Weight" },
@@ -11,12 +11,96 @@ const bodyGoals = [
 
 export default function EditProfileScreen() {
   const router = useRouter();
+  const [userId, setUserId] = useState<number | null>(null);
+  const [userInfoId, setUserInfoId] = useState<number | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [age, setAge] = useState("");
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
   const [bodyGoalId, setBodyGoalId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch current profile info on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch("http://192.168.254.144:5129/api/account/getProfile", {
+          credentials: "include"
+        });
+        const data = await res.json();
+        const userInfo = data.userInfo || {};
+        setUserId(data.userId || null);
+        setUserInfoId(userInfo.userInfoId || null);
+        setEmail(data.email || "");
+        setPassword(""); // Don't prefill password for security
+        setFirstName(userInfo.firstName || "");
+        setLastName(userInfo.lastName || "");
+        setAge(userInfo.age ? String(userInfo.age) : "");
+        setWeight(userInfo.weight ? String(userInfo.weight) : "");
+        setHeight(userInfo.height ? String(userInfo.height) : "");
+        setBodyGoalId(userInfo.bodyGoalId || null);
+      } catch (e) {
+        // Could not fetch profile
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const handleSave = async () => {
+    // Only require fields that map to dbo.Userinfo
+    if (
+      String(firstName).trim() === "" ||
+      String(lastName).trim() === "" ||
+      String(age).trim() === "" ||
+      String(weight).trim() === "" ||
+      String(height).trim() === ""
+    ) {
+      Alert.alert("Error", "Please fill in all fields.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const safeUserInfoId = userInfoId || 1;
+      const safeBodyGoalId = bodyGoalId || 1;
+      const payload = {
+        userInfoId: safeUserInfoId,
+        firstName,
+        lastName,
+        age: Number(age),
+        weight: Number(weight),
+        height: Number(height),
+        bodyGoalId: safeBodyGoalId
+      };
+      const response = await fetch("http://192.168.254.144:5129/api/account/updateAccount", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      });
+      let data = null;
+      try {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : null;
+      } catch (parseErr) {
+        console.log('Profile update parse error:', parseErr);
+      }
+      setLoading(false);
+      if ((data && data.message && data.message.toLowerCase().includes("success")) || response.ok) {
+        Alert.alert("Success", "Profile updated successfully.", [
+          { text: "OK", onPress: () => router.back() }
+        ]);
+      } else {
+        Alert.alert("Error", (data && data.message) || "Failed to update profile.");
+      }
+    } catch (e) {
+      setLoading(false);
+      console.log('Profile update error:', e);
+      Alert.alert("Error", "Failed to update profile.");
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -39,8 +123,8 @@ export default function EditProfileScreen() {
         ))}
       </View>
       <CustomButton
-        title="Save"
-        onPress={() => router.back()}
+        title={loading ? "Saving..." : "Save"}
+        onPress={handleSave}
         backgroundColor="#FCB647"
         textColor="white"
       />

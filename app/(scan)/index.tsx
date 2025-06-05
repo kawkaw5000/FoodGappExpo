@@ -2,19 +2,18 @@ import React, { useState, useRef } from "react";
 import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import CustomButton from "@/components/buttons/CustomButton";
+import { useRouter } from "expo-router";
 
 export default function ScanScreen() {
+  const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const [hasPermission, setHasPermission] = useState<null | boolean>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [scanComplete, setScanComplete] = useState(false);
-  const [loading, setLoading] = useState(false);
   const cameraRef = useRef<any>(null);
 
   // Request camera permission and show camera
   const handleScanNow = async () => {
-    setLoading(true);
     if (!permission || !permission.granted) {
       const perm = await requestPermission();
       setHasPermission(perm.granted);
@@ -23,37 +22,55 @@ export default function ScanScreen() {
       setHasPermission(true);
       setShowCamera(true);
     }
-    setLoading(false);
   };
 
   // Simulate scan/capture
   const handleCapture = async () => {
-    setIsScanning(true);
-    // Simulate a scan delay
-    setTimeout(() => {
+    if (!cameraRef.current) return;
+    try {
+      setIsScanning(true);
+      const photo = await cameraRef.current.takePictureAsync({ base64: false });
+      const formData = new FormData();
+      formData.append("file", {
+        uri: photo.uri,
+        name: "scanned.jpg",
+        type: "image/jpeg",
+      } as any);
+      const response = await fetch("http://192.168.254.144:5000/describe_image", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      const result = await response.json();
+      console.log("Flask result:", result);
+      alert(`Detected food: ${result.description}`);
+      setShowCamera(false);
+      setIsScanning(false);
+    } catch (err) {
+      console.error("Capture failed:", err);
+      alert("Failed to scan. Try again.");
+    } finally {
       setIsScanning(false);
       setShowCamera(false);
-      setScanComplete(true);
-    }, 1200);
-  };
-
-  // Reset to scan again
-  const handleNext = () => {
-    setScanComplete(false);
+    }
   };
 
   // Initial state: show Scan Now button
-  if (!showCamera && !scanComplete) {
+  if (!showCamera) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
           <Image source={require("../../assets/images/Dashboard Icons/Scan_Highlight.png")} style={styles.image} />
           <Text style={styles.title}>Scan your food</Text>
           <Text style={styles.subtitle}>Point your camera to the food or ingredient you want to scan.</Text>
-          <View style={styles.scanNowBtn}><CustomButton
-            title={loading ? "Requesting..." : "Scan Now"}
-            onPress={handleScanNow}
-          /></View>
+          <View style={styles.scanNowBtn}>
+            <CustomButton title={permission?.granted ? (isScanning ? "Scanning..." : "Scan Now") : "Enable Camera"} onPress={handleScanNow} />
+          </View>
+          <Text style={{ marginTop: 16, color: '#FCB647', textDecorationLine: 'underline' }} onPress={() => router.push('/(scan)/manualEntry')}>
+            Specific food?
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -73,21 +90,6 @@ export default function ScanScreen() {
           <TouchableOpacity style={styles.captureBtn} onPress={handleCapture} disabled={isScanning}>
             <Text style={styles.captureBtnText}>{isScanning ? "Scanning..." : "Capture"}</Text>
           </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Scan complete state
-  if (scanComplete) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centered}>
-          {/* Fallback icon if reference image is missing */}
-          <Image source={require("../../assets/images/Dashboard Icons/Scan_Highlight.png")} style={styles.successIcon} />
-          <Text style={styles.successTitle}>Food scanned!</Text>
-          <Text style={styles.successSubtitle}>Food successfully scanned. Press "Next" to see food content.</Text>
-          <View style={styles.nextBtn}><CustomButton title="Next" onPress={handleNext} /></View>
         </View>
       </SafeAreaView>
     );
@@ -234,5 +236,36 @@ const styles = StyleSheet.create({
   nextBtn: {
     width: "100%",
     marginTop: 10,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 24,
+    alignItems: "center",
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+    color: "#222",
+    textAlign: "center",
+  },
+  modalInput: {
+    width: "100%",
+    height: 50,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 16,
+    marginBottom: 16,
   },
 });
