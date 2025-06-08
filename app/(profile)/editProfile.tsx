@@ -2,6 +2,7 @@ import { View, Text, TextInput, SafeAreaView, StyleSheet, TouchableOpacity, Aler
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
+import Config from "@/constants/Config";
 
 const bodyGoals = [
   { id: 1, label: "Lose Weight" },
@@ -12,7 +13,6 @@ const bodyGoals = [
 export default function EditProfileScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<number | null>(null);
-  const [userInfoId, setUserInfoId] = useState<number | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -27,21 +27,23 @@ export default function EditProfileScreen() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch("http://192.168.254.117:5129/api/account/getProfile", {
+        const res = await fetch(`${Config.Account_API}/userInfo`, {
           credentials: "include"
         });
         const data = await res.json();
-        const userInfo = data.userInfo || {};
-        setUserId(data.userId || null);
-        setUserInfoId(userInfo.userInfoId || null);
-        setEmail(data.email || "");
-        setPassword(""); // Don't prefill password for security
+        const userInfo = data.data || {};  
+        // setUserId(data.userId || null);
+        // setUserInfoId(userInfo.userInfoId || null);
+        // setEmail(data.email || "");
+        // setPassword(""); // Don't prefill password for security
         setFirstName(userInfo.firstName || "");
         setLastName(userInfo.lastName || "");
         setAge(userInfo.age ? String(userInfo.age) : "");
         setWeight(userInfo.weight ? String(userInfo.weight) : "");
         setHeight(userInfo.height ? String(userInfo.height) : "");
         setBodyGoalId(userInfo.bodyGoalId || null);
+
+        console.log('EditProfileScreen: fetched profile:', data);
       } catch (e) {
         // Could not fetch profile
       }
@@ -73,7 +75,7 @@ export default function EditProfileScreen() {
         height: Number(height),
         bodyGoalId: safeBodyGoalId
       };
-      const response = await fetch("http://192.168.254.117:5129/api/account/updateUserInfo", {
+      const response = await fetch(`${Config.Account_API}/updateUserInfo`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -108,65 +110,28 @@ export default function EditProfileScreen() {
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Delete", style: "destructive", onPress: async () => {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
             setLoading(true);
             try {
-              // First delete UserInfo (profile), then User (account)
-              let userInfoDeleted = false;
-              let userDeleted = false;
-              let errorMsg = "";
-              if (userInfoId) {
-                const resInfo = await fetch(`http://192.168.254.144:5129/api/account/deleteUserInfo?userInfoId=${userInfoId}`, {
-                  method: "DELETE",
-                  credentials: "include"
-                });
-                const textInfo = await resInfo.text();
-                let dataInfo;
-                try {
-                  dataInfo = textInfo ? JSON.parse(textInfo) : null;
-                } catch (err) {
-                  dataInfo = { message: textInfo };
-                }
-                if (resInfo.ok && dataInfo && dataInfo.message && dataInfo.message.toLowerCase().includes("success")) {
-                  userInfoDeleted = true;
-                } else {
-                  console.log('Delete userInfo: backend response:', dataInfo);
-                }
-              }
-              if (userId) {
-                const resUser = await fetch(`http://192.168.254.144:5129/api/account/deleteUser?userId=${userId}`, {
-                  method: "DELETE",
-                  credentials: "include"
-                });
-                const textUser = await resUser.text();
-                let dataUser;
-                try {
-                  dataUser = textUser ? JSON.parse(textUser) : null;
-                } catch (err) {
-                  dataUser = { message: textUser };
-                }
-                if (resUser.ok && dataUser && dataUser.message && dataUser.message.toLowerCase().includes("success")) {
-                  userDeleted = true;
-                } else {
-                  console.log('Delete user: backend response:', dataUser);
-                }
-              }
-              setLoading(false);
-              if (userInfoDeleted && userDeleted) {
-                Alert.alert("Deleted", "Your account and profile have been deleted.", [
-                  { text: "OK", onPress: () => router.replace("/(login)/loginScreen") }
-                ]);
-              } else if (userDeleted) {
-                Alert.alert("Deleted", "Your account has been deleted.", [
-                  { text: "OK", onPress: () => router.replace("/(login)/loginScreen") }
-                ]);
+              const resInfo = await fetch(`${Config.Account_API}/deleteAccount`, {
+                method: "DELETE",
+              });
+
+              if (resInfo.ok) {
+                // Optionally clear local storage / tokens here
+                router.replace("/(login)/loginScreen");
               } else {
-                Alert.alert("Error", "Failed to delete account and profile. Please try again.");
+                const errorText = await resInfo.text();
+                console.log("Delete failed:", errorText);
+                Alert.alert("Error", "Failed to delete account.");
               }
             } catch (e) {
-              setLoading(false);
-              console.log('Delete account: fetch error:', e);
+              console.log("Delete account: fetch error:", e);
               Alert.alert("Error", "Failed to delete account.");
+            } finally {
+              setLoading(false);
             }
           }
         }
