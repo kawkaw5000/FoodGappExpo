@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity, Alert, S
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
 import { useCallback, useState, useEffect } from "react";
+import axios from "axios";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -9,9 +10,9 @@ export default function ProfileScreen() {
     router.replace("/(login)/loginScreen");
   }, [router]);
 
+  
   // Example user profile state (replace with real data or context as needed)
   const [profile, setProfile] = useState({
-    userId: null,
     firstName: "",
     lastName: "",
     age: "",
@@ -23,24 +24,23 @@ export default function ProfileScreen() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch("http://192.168.254.144:5129/api/account/getProfile", {
+        const res = await fetch("http://192.168.254.117:5129/api/account/userinfo", {
           credentials: "include"
         });
+
         const data = await res.json();
-        console.log('Profile fetch response:', data);
-        // If userInfo is present, use its fields
-        const userInfo = data.userInfo || {};
+        const userInfo = data.data || {};     
         setProfile({
-          userId: data.userId || null,
-          firstName: userInfo.firstName || data.firstName || "",
-          lastName: userInfo.lastName || data.lastName || "",
+          firstName: userInfo.firstName,
+          lastName: userInfo.lastName,
           age: userInfo.age ? String(userInfo.age) : (data.age ? String(data.age) : ""),
           weight: userInfo.weight ? String(userInfo.weight) : (data.weight ? String(data.weight) : ""),
           height: userInfo.height ? String(userInfo.height) : (data.height ? String(data.height) : ""),
           bodyGoal: userInfo.bodyGoal || data.bodyGoal || ""
         });
       } catch (e) {
-        // Could not fetch profile
+        console.log('get info fetch error:', e);
+        Alert.alert("Error", "Failed to get profile.");
       }
     };
     fetchProfile();
@@ -59,7 +59,7 @@ export default function ProfileScreen() {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ userId: profile.userId || 1 })
+                // body: JSON.stringify({ userId: profile.userId || 1 })
               });
               const text = await response.text();
               let data;
@@ -94,12 +94,12 @@ export default function ProfileScreen() {
           <Text style={styles.title}>This is the Profile page</Text>
           {/* Profile Info Display */}
           <View style={styles.profileInfoBox}>
-            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>First Name:</Text> {profile.firstName ? profile.firstName : 'NULL'}</Text>
-            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Last Name:</Text> {profile.lastName ? profile.lastName : 'NULL'}</Text>
-            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Age:</Text> {profile.age ? profile.age : 'NULL'}</Text>
-            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Weight:</Text> {profile.weight ? profile.weight + ' kg' : 'NULL'}</Text>
-            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Height:</Text> {profile.height ? profile.height + ' cm' : 'NULL'}</Text>
-            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Body Goal:</Text> {profile.bodyGoal ? profile.bodyGoal : 'NULL'}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>First Name:</Text> {profile.firstName ? profile.firstName : ' '}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Last Name:</Text> {profile.lastName ? profile.lastName : ' '}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Age:</Text> {profile.age ? profile.age : ' '}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Weight:</Text> {profile.weight ? profile.weight + ' kg' : ' '}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Height:</Text> {profile.height ? profile.height + ' cm' : ' '}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Body Goal:</Text> {profile.bodyGoal ? profile.bodyGoal : ' '}</Text>
           </View>
           <CustomButton
             title="Edit Profile"

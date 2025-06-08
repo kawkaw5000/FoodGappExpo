@@ -27,7 +27,7 @@ export default function EditProfileScreen() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch("http://192.168.254.144:5129/api/account/getProfile", {
+        const res = await fetch("http://192.168.254.117:5129/api/account/getProfile", {
           credentials: "include"
         });
         const data = await res.json();
@@ -63,10 +63,9 @@ export default function EditProfileScreen() {
     }
     setLoading(true);
     try {
-      const safeUserInfoId = userInfoId || 1;
+      // const safeUserInfoId = userInfoId || 1;
       const safeBodyGoalId = bodyGoalId || 1;
-      const payload = {
-        userInfoId: safeUserInfoId,
+      const payload = {    
         firstName,
         lastName,
         age: Number(age),
@@ -74,7 +73,7 @@ export default function EditProfileScreen() {
         height: Number(height),
         bodyGoalId: safeBodyGoalId
       };
-      const response = await fetch("http://192.168.254.144:5129/api/account/updateUserInfo", {
+      const response = await fetch("http://192.168.254.117:5129/api/account/updateUserInfo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
