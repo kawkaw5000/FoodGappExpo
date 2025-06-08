@@ -19,7 +19,66 @@ export default function RegisterScreen() {
   const [isChecked, setIsChecked] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isConfirmPassVisible, setIsConfirmPassVisible] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [age, setAge] = useState("");
+  const [weight, setWeight] = useState("");
+  const [height, setHeight] = useState("");
+  const [bodyGoalId, setBodyGoalId] = useState<number>(1);
   const { width } = Dimensions.get("window");
+
+  const handleRegister = async () => {
+    if (!email || !password || !confirmPassword) {
+      Alert.alert("Error", "Please fill in all required fields.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match.");
+      return;
+    }
+    if (!isChecked) {
+      Alert.alert("Error", "You must agree to the Privacy & Policy.");
+      return;
+    }
+    try {
+      const payload = {
+        email,
+        password,
+        firstName: firstName || null,
+        lastName: lastName || null
+      };
+      const response = await axios.post(`${Account_API}/register`, payload);
+      if (response.data && response.data.message && response.data.message.toLowerCase().includes("success")) {
+        // Registration successful, now create UserInfo
+        try {
+          // Login to get cookie/session for createUserInfo
+          await axios.post(`${Account_API}/login`, { email, password }, { withCredentials: true });
+          const userInfoPayload = {
+            age: age ? Number(age) : null,
+            weight: weight ? Number(weight) : null,
+            height: height ? Number(height) : null,
+            bodyGoalId: bodyGoalId || null,
+            firstName: firstName || null,
+            lastName: lastName || null
+          };
+          await axios.post(`${Account_API}/createUserInfo`, userInfoPayload, { withCredentials: true });
+        } catch (userInfoErr) {
+          // Optionally handle error
+        }
+        Alert.alert("Success", "Registration successful!", [
+          { text: "OK", onPress: () => router.replace("/(login)/loginScreen") }
+        ]);
+      } else {
+        Alert.alert("Error", (response.data && response.data.error) || "Registration failed.");
+      }
+    } catch (err: any) {
+      let msg = "Registration failed.";
+      if (err.response && err.response.data && err.response.data.error) {
+        msg = err.response.data.error;
+      }
+      Alert.alert("Error", msg);
+    }
+  };
 
   
   return (
@@ -145,7 +204,7 @@ export default function RegisterScreen() {
             <View>
               <CustomButton
                 title="Confirm"
-                onPress={() => router.replace("/(register)/registerMainScreen")}
+                onPress={handleRegister}
                 backgroundColor="#FCB647"
                 textColor="white"  
               />
@@ -170,7 +229,89 @@ export default function RegisterScreen() {
             </TouchableOpacity>
             </View>
         </View>  
-           
+        <View style={{gap: 20, width: "100%"}}>
+        <View style={{ position: "relative"}}>
+          <TextInput
+            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
+            placeholder=""
+            value={firstName}
+            onChangeText={setFirstName}
+          />
+          <View style={{position: "absolute", top:-35}}>
+            <Text style={{fontSize: 20, fontWeight: "bold"}}>First Name</Text>
+          </View>
+        </View>
+        <View style={{ position: "relative"}}>
+          <TextInput
+            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
+            placeholder=""
+            value={lastName}
+            onChangeText={setLastName}
+          />
+          <View style={{position: "absolute", top:-35}}>
+            <Text style={{fontSize: 20, fontWeight: "bold"}}>Last Name</Text>
+          </View>
+        </View>
+        <View style={{ position: "relative"}}>
+          <TextInput
+            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
+            placeholder=""
+            value={age}
+            onChangeText={setAge}
+            keyboardType="numeric"
+          />
+          <View style={{position: "absolute", top:-35}}>
+            <Text style={{fontSize: 20, fontWeight: "bold"}}>Age</Text>
+          </View>
+        </View>
+        <View style={{ position: "relative"}}>
+          <TextInput
+            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
+            placeholder=""
+            value={weight}
+            onChangeText={setWeight}
+            keyboardType="numeric"
+          />
+          <View style={{position: "absolute", top:-35}}>
+            <Text style={{fontSize: 20, fontWeight: "bold"}}>Weight</Text>
+          </View>
+        </View>
+        <View style={{ position: "relative"}}>
+          <TextInput
+            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
+            placeholder=""
+            value={height}
+            onChangeText={setHeight}
+            keyboardType="numeric"
+          />
+          <View style={{position: "absolute", top:-35}}>
+            <Text style={{fontSize: 20, fontWeight: "bold"}}>Height</Text>
+          </View>
+        </View>
+        <View style={{ position: "relative"}}>
+          <Text style={{fontSize: 20, fontWeight: "bold", marginBottom: 5}}>Body Goal</Text>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            {[{id:1,label:'Lose Weight'},{id:2,label:'Maintain Weight'},{id:3,label:'Gain Weight'}].map(goal => (
+              <TouchableOpacity
+                key={goal.id}
+                style={{
+                  borderWidth: 1,
+                  borderColor: bodyGoalId === goal.id ? "#FCB647" : "#ccc",
+                  backgroundColor: bodyGoalId === goal.id ? "#FCB647" : "#fff",
+                  borderRadius: 20,
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  marginVertical: 5,
+                  alignItems: "center"
+                }}
+                onPress={() => setBodyGoalId(goal.id)}
+              >
+                <Text style={{ color: bodyGoalId === goal.id ? "#fff" : "#FCB647", fontWeight: "bold" }}>{goal.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
       </View>
     </SafeAreaView>
   );

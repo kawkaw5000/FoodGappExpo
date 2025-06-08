@@ -74,7 +74,7 @@ export default function EditProfileScreen() {
         height: Number(height),
         bodyGoalId: safeBodyGoalId
       };
-      const response = await fetch("http://192.168.254.144:5129/api/account/updateAccount", {
+      const response = await fetch("http://192.168.254.144:5129/api/account/updateUserInfo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -102,6 +102,79 @@ export default function EditProfileScreen() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to delete your account? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete", style: "destructive", onPress: async () => {
+            setLoading(true);
+            try {
+              // First delete UserInfo (profile), then User (account)
+              let userInfoDeleted = false;
+              let userDeleted = false;
+              let errorMsg = "";
+              if (userInfoId) {
+                const resInfo = await fetch(`http://192.168.254.144:5129/api/account/deleteUserInfo?userInfoId=${userInfoId}`, {
+                  method: "DELETE",
+                  credentials: "include"
+                });
+                const textInfo = await resInfo.text();
+                let dataInfo;
+                try {
+                  dataInfo = textInfo ? JSON.parse(textInfo) : null;
+                } catch (err) {
+                  dataInfo = { message: textInfo };
+                }
+                if (resInfo.ok && dataInfo && dataInfo.message && dataInfo.message.toLowerCase().includes("success")) {
+                  userInfoDeleted = true;
+                } else {
+                  console.log('Delete userInfo: backend response:', dataInfo);
+                }
+              }
+              if (userId) {
+                const resUser = await fetch(`http://192.168.254.144:5129/api/account/deleteUser?userId=${userId}`, {
+                  method: "DELETE",
+                  credentials: "include"
+                });
+                const textUser = await resUser.text();
+                let dataUser;
+                try {
+                  dataUser = textUser ? JSON.parse(textUser) : null;
+                } catch (err) {
+                  dataUser = { message: textUser };
+                }
+                if (resUser.ok && dataUser && dataUser.message && dataUser.message.toLowerCase().includes("success")) {
+                  userDeleted = true;
+                } else {
+                  console.log('Delete user: backend response:', dataUser);
+                }
+              }
+              setLoading(false);
+              if (userInfoDeleted && userDeleted) {
+                Alert.alert("Deleted", "Your account and profile have been deleted.", [
+                  { text: "OK", onPress: () => router.replace("/(login)/loginScreen") }
+                ]);
+              } else if (userDeleted) {
+                Alert.alert("Deleted", "Your account has been deleted.", [
+                  { text: "OK", onPress: () => router.replace("/(login)/loginScreen") }
+                ]);
+              } else {
+                Alert.alert("Error", "Failed to delete account and profile. Please try again.");
+              }
+            } catch (e) {
+              setLoading(false);
+              console.log('Delete account: fetch error:', e);
+              Alert.alert("Error", "Failed to delete account.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Edit Profile</Text>
@@ -122,12 +195,24 @@ export default function EditProfileScreen() {
           </TouchableOpacity>
         ))}
       </View>
-      <CustomButton
-        title={loading ? "Saving..." : "Save"}
-        onPress={handleSave}
-        backgroundColor="#FCB647"
-        textColor="white"
-      />
+      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '80%', marginTop: 8 }}>
+        <View style={{ flex: 1, marginRight: 8 }}>
+          <CustomButton
+            title={loading ? "Saving..." : "Save"}
+            onPress={handleSave}
+            backgroundColor="#FCB647"
+            textColor="white"
+          />
+        </View>
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <CustomButton
+            title="Delete"
+            onPress={handleDeleteAccount}
+            backgroundColor="#d9534f"
+            textColor="white"
+          />
+        </View>
+      </View>
     </SafeAreaView>
   );
 }

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity, Alert, ScrollView } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
 import { useCallback, useState, useEffect } from "react";
@@ -61,14 +61,23 @@ export default function ProfileScreen() {
                 credentials: "include",
                 body: JSON.stringify({ userId: profile.userId || 1 })
               });
-              const data = await response.json();
+              const text = await response.text();
+              let data;
+              try {
+                data = text ? JSON.parse(text) : null;
+              } catch (err) {
+                console.log('Delete profile: failed to parse response:', text);
+                data = { message: text };
+              }
               if (data && data.message && data.message.toLowerCase().includes("success")) {
                 Alert.alert("Deleted", "Your profile has been deleted.");
                 router.replace("/(login)/loginScreen");
               } else {
-                Alert.alert("Error", data.message || "Failed to delete profile.");
+                console.log('Delete profile: backend response:', data);
+                Alert.alert("Error", (data && data.message) || "Failed to delete profile.");
               }
             } catch (e) {
+              console.log('Delete profile: fetch error:', e);
               Alert.alert("Error", "Failed to delete profile.");
             }
           }
@@ -79,40 +88,35 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.centered}>
-        <Image source={require("../../assets/images/Dashboard Icons/Profile_Highlight.png")} style={styles.image} />
-        <Text style={styles.title}>This is the Profile page</Text>
-        {/* Profile Info Display */}
-        <View style={styles.profileInfoBox}>
-          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>First Name:</Text> {profile.firstName || 'NULL'}</Text>
-          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Last Name:</Text> {profile.lastName || 'NULL'}</Text>
-          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Age:</Text> {profile.age || 'NULL'}</Text>
-          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Weight:</Text> {profile.weight ? profile.weight + ' kg' : 'NULL'}</Text>
-          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Height:</Text> {profile.height ? profile.height + ' cm' : 'NULL'}</Text>
-          <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Body Goal:</Text> {profile.bodyGoal || 'NULL'}</Text>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <View style={styles.centered}>
+          <Image source={require("../../assets/images/Dashboard Icons/Profile_Highlight.png")} style={styles.image} />
+          <Text style={styles.title}>This is the Profile page</Text>
+          {/* Profile Info Display */}
+          <View style={styles.profileInfoBox}>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>First Name:</Text> {profile.firstName ? profile.firstName : 'NULL'}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Last Name:</Text> {profile.lastName ? profile.lastName : 'NULL'}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Age:</Text> {profile.age ? profile.age : 'NULL'}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Weight:</Text> {profile.weight ? profile.weight + ' kg' : 'NULL'}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Height:</Text> {profile.height ? profile.height + ' cm' : 'NULL'}</Text>
+            <Text style={styles.profileInfo}><Text style={styles.profileLabel}>Body Goal:</Text> {profile.bodyGoal ? profile.bodyGoal : 'NULL'}</Text>
+          </View>
+          <CustomButton
+            title="Edit Profile"
+            onPress={() => router.push("/(profile)/editProfile")}
+            backgroundColor="#333"
+            textColor="white"
+          />
+          <View style={{ height: 12 }} />
+          <View style={{ height: 16 }} />
+          <CustomButton
+            title="Logout"
+            onPress={handleLogout}
+            backgroundColor="#FCB647"
+            textColor="white"
+          />
         </View>
-        <CustomButton
-          title="Edit Profile"
-          onPress={() => router.push("/(profile)/editProfile")}
-          backgroundColor="#333"
-          textColor="white"
-        />
-        <View style={styles.spacer} />
-      </View>
-      <View style={{ height: 12 }} />
-      <View style={{ height: 16 }} />
-      <CustomButton
-        title="Logout"
-        onPress={handleLogout}
-        backgroundColor="#FCB647"
-        textColor="white"
-      />
-      <CustomButton
-        title="Delete Profile"
-        onPress={handleDeleteProfile}
-        backgroundColor="#d9534f"
-        textColor="white"
-      />
+      </ScrollView>
     </SafeAreaView>
   );
 }

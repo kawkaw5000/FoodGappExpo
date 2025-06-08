@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 export default function ManualEntryScreen() {
-  const [food, setFood] = useState("");
+  const { food: foodParam } = useLocalSearchParams();
+  const [food, setFood] = useState(typeof foodParam === 'string' ? foodParam : "");
   const [grams, setGrams] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSaveButton, setShowSaveButton] = useState(false);
