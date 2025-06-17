@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, SafeAreaView, StyleSheet, Image, TouchableOpacity } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
+import Config from "@/constants/Config";
 
 const dashboardIcons = [
   { name: "Log", icon: require("../../assets/images/Dashboard Icons/Food_Nohighlight.png"), highlight: require("../../assets/images/Dashboard Icons/Food_Highlight.png"), route: "/(log)" },
@@ -33,7 +34,7 @@ export default function ProfilePage() {
         setLoading(false);
         return;
       }
-      let url = `http://192.168.254.144:5129/api/account/getProfile?userId=${encodeURIComponent(userId)}`;
+      let url = `${Config.Account_API}/api/account/getProfile?userId=${encodeURIComponent(userId)}`;
       if (userInfoId) url += `&userInfoId=${encodeURIComponent(userInfoId)}`;
       const response = await fetch(url);
       const data = await response.json();

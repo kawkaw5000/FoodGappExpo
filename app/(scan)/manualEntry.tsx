@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, TextInput, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import Config from "@/constants/Config";
 
 export default function ManualEntryScreen() {
   const { food: foodParam } = useLocalSearchParams();
@@ -29,7 +30,7 @@ export default function ManualEntryScreen() {
           }
         ]
       };
-      const response = await fetch("http://192.168.254.144:5000/get_nutritional_info", {
+      const response = await fetch(Config.BASE_URL + "/get_nutritional_info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

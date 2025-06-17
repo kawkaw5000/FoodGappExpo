@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity, Activity
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
+import Config from "@/constants/Config";
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function ScanScreen() {
         name: "scanned.jpg",
         type: "image/jpeg",
       } as any);
-      const response = await fetch("http://192.168.254.144:5000/describe_image", {
+      const response = await fetch(Config.DESCRIBE_IMAGE_API, {
         method: "POST",
         body: formData,
         headers: {

@@ -3,6 +3,7 @@ import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import Config from "@/constants/Config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const bodyGoals = [
   { id: 1, label: "Lose Weight" },
@@ -23,29 +24,32 @@ export default function EditProfileScreen() {
   const [bodyGoalId, setBodyGoalId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Fetch current profile info on mount
+  // Fetch current profile info on mount using unified User model
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch(`${Config.Account_API}/userInfo`, {
-          credentials: "include"
-        });
-        const data = await res.json();
-        const userInfo = data.data || {};  
-        // setUserId(data.userId || null);
-        // setUserInfoId(userInfo.userInfoId || null);
-        // setEmail(data.email || "");
-        // setPassword(""); // Don't prefill password for security
-        setFirstName(userInfo.firstName || "");
-        setLastName(userInfo.lastName || "");
-        setAge(userInfo.age ? String(userInfo.age) : "");
-        setWeight(userInfo.weight ? String(userInfo.weight) : "");
-        setHeight(userInfo.height ? String(userInfo.height) : "");
-        setBodyGoalId(userInfo.bodyGoalId || null);
-
-        console.log('EditProfileScreen: fetched profile:', data);
+        const storedUserId = await AsyncStorage.getItem('userId');
+        if (!storedUserId) {
+          Alert.alert("Error", "No userId found. Please log in again.");
+          return;
+        }
+        setUserId(Number(storedUserId));
+        const res = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(storedUserId)}`);
+        if (!res.ok) {
+          const errorText = await res.text();
+          Alert.alert("Error", "Failed to load profile: " + errorText);
+          return;
+        }
+        const user = await res.json();
+        setFirstName(user.firstName ?? "");
+        setLastName(user.lastName ?? "");
+        setAge(user.age != null ? String(user.age) : "");
+        setWeight(user.weight != null ? String(user.weight) : "");
+        setHeight(user.height != null ? String(user.height) : "");
+        setBodyGoalId(user.bodyGoalId != null ? user.bodyGoalId : null);
+        setEmail(user.email ?? "");
       } catch (e) {
-        // Could not fetch profile
+        Alert.alert("Error", "Could not fetch profile");
       }
     };
     fetchProfile();

@@ -3,6 +3,8 @@ import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
 import { useCallback, useState, useEffect } from "react";
 import axios from "axios";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Config from '@/constants/Config';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -24,19 +26,26 @@ export default function ProfileScreen() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch("http://192.168.254.117:5129/api/account/userinfo", {
-          credentials: "include"
-        });
-
-        const data = await res.json();
-        const userInfo = data.data || {};     
+        const storedUserId = await AsyncStorage.getItem('userId');
+        if (!storedUserId) {
+          Alert.alert("Error", "No userId found. Please log in again.");
+          return;
+        }
+        // Use centralized API config
+        const res = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(storedUserId)}`);
+        if (!res.ok) {
+          const errorText = await res.text();
+          Alert.alert("Error", "Failed to get profile: " + errorText);
+          return;
+        }
+        const user = await res.json();
         setProfile({
-          firstName: userInfo.firstName,
-          lastName: userInfo.lastName,
-          age: userInfo.age ? String(userInfo.age) : (data.age ? String(data.age) : ""),
-          weight: userInfo.weight ? String(userInfo.weight) : (data.weight ? String(data.weight) : ""),
-          height: userInfo.height ? String(userInfo.height) : (data.height ? String(data.height) : ""),
-          bodyGoal: userInfo.bodyGoal || data.bodyGoal || ""
+          firstName: user.firstName ?? "NULL",
+          lastName: user.lastName ?? "NULL",
+          age: user.age != null ? String(user.age) : "NULL",
+          weight: user.weight != null ? String(user.weight) : "NULL",
+          height: user.height != null ? String(user.height) : "NULL",
+          bodyGoal: user.bodyGoalId != null ? String(user.bodyGoalId) : "NULL"
         });
       } catch (e) {
         console.log('get info fetch error:', e);
@@ -55,11 +64,12 @@ export default function ProfileScreen() {
         {
           text: "Delete", style: "destructive", onPress: async () => {
             try {
-              const response = await fetch("http://192.168.254.144:5129/api/account/deleteAccount", {
+              const response = await fetch(`${Config.Account_API}/deleteAccount`, {
                 method: "DELETE",
-                headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                // body: JSON.stringify({ userId: profile.userId || 1 })
+                headers: {
+                  "Content-Type": "application/json",
+                },
               });
               const text = await response.text();
               let data;
