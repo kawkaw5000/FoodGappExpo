@@ -1,19 +1,22 @@
-import { TouchableOpacity, Text, StyleSheet } from "react-native";
+import { TouchableOpacity, Text, StyleSheet, ViewStyle } from "react-native";
 
 interface CustomButtonProps {
   title: string;
   onPress: () => void;
   backgroundColor?: string;
   textColor?: string;
+  style?: ViewStyle;
+  disabled?: boolean;
 }
 
-export default function CustomButton({ title, onPress, backgroundColor = "#6200ea", textColor = "white" }: CustomButtonProps) {
+export default function CustomButton({ title, onPress, backgroundColor = "#6200ea", textColor = "white", style, disabled = false }: CustomButtonProps) {
   return (
     <TouchableOpacity 
-      style={[styles.button, { backgroundColor }]} 
+      style={[styles.button, { backgroundColor: disabled ? "#ccc" : backgroundColor }, style]} 
       onPress={onPress}
+      disabled={disabled}
     >
-      <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+      <Text style={[styles.buttonText, { color: disabled ? "#666" : textColor }]}>{title}</Text>
     </TouchableOpacity>
   );
 }

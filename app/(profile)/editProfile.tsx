@@ -1,4 +1,4 @@
-import { View, Text, TextInput, SafeAreaView, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, TextInput, SafeAreaView, StyleSheet, TouchableOpacity, Alert, ScrollView } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
@@ -145,29 +145,34 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Edit Profile</Text>
-      <TextInput style={styles.input} placeholder="First Name" value={firstName} onChangeText={setFirstName} />
-      <TextInput style={styles.input} placeholder="Last Name" value={lastName} onChangeText={setLastName} />
-      <TextInput style={styles.input} placeholder="Age" value={age} onChangeText={setAge} keyboardType="numeric" />
-      <TextInput style={styles.input} placeholder="Weight (kg)" value={weight} onChangeText={setWeight} keyboardType="numeric" />
-      <TextInput style={styles.input} placeholder="Height (cm)" value={height} onChangeText={setHeight} keyboardType="numeric" />
-      <Text style={styles.label}>Body Goal</Text>
-      <View style={styles.radialMenu}>
-        {bodyGoals.map(goal => (
-          <TouchableOpacity
-            key={goal.id}
-            style={[styles.radialButton, bodyGoalId === goal.id && styles.radialButtonActive]}
-            onPress={() => setBodyGoalId(goal.id)}
-          >
-            <Text style={bodyGoalId === goal.id ? styles.radialTextActive : styles.radialText}>{goal.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '80%', marginTop: 8 }}>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <CustomButton
-            title={loading ? "Saving..." : "Save"}
-            onPress={handleSave}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>Edit Profile</Text>
+        <TextInput style={styles.input} placeholder="First Name" value={firstName} onChangeText={setFirstName} />
+        <TextInput style={styles.input} placeholder="Last Name" value={lastName} onChangeText={setLastName} />
+        <TextInput style={styles.input} placeholder="Age" value={age} onChangeText={setAge} keyboardType="numeric" />
+        <TextInput style={styles.input} placeholder="Weight (kg)" value={weight} onChangeText={setWeight} keyboardType="numeric" />
+        <TextInput style={styles.input} placeholder="Height (cm)" value={height} onChangeText={setHeight} keyboardType="numeric" />
+        <Text style={styles.label}>Body Goal</Text>
+        <View style={styles.radialMenu}>
+          {bodyGoals.map(goal => (
+            <TouchableOpacity
+              key={goal.id}
+              style={[styles.radialButton, bodyGoalId === goal.id && styles.radialButtonActive]}
+              onPress={() => setBodyGoalId(goal.id)}
+            >
+              <Text style={bodyGoalId === goal.id ? styles.radialTextActive : styles.radialText}>{goal.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '80%', marginTop: 8 }}>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <CustomButton
+              title={loading ? "Saving..." : "Save"}
+              onPress={handleSave}
             backgroundColor="#FCB647"
             textColor="white"
           />
@@ -181,12 +186,23 @@ export default function EditProfileScreen() {
           />
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },
+  scrollView: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
   input: {
     width: "80%",

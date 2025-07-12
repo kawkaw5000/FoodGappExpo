@@ -8,23 +8,31 @@ import BottomNavBar from "@/components/NavigationBar";
 export default function RootLayout() {
   const pathname = usePathname(); 
 
-  const hideBottomNav = pathname === "/loginScreen" || pathname === "/registerScreen" || pathname === "/registerMainScreen";
+  const hideBottomNav = pathname === "/loginScreen" || 
+                        pathname === "/registerScreen" || 
+                        pathname === "/registerMainScreen" ||
+                        pathname.includes('/manualEntry') ||
+                        pathname.includes('/scan');
   useEffect(() => {
     console.log(hideBottomNav)
     console.log(pathname)
   })
   const router = useRouter();
-    const currentRoute = "/(login)/loginScreen";
+  const currentRoute = pathname; // Use actual current pathname instead of hardcoded value
   
-    const handleNav = (route: string) => {
-      if (route !== currentRoute) router.replace(route as any);
-    };
+  const handleNav = (route: string) => {
+    if (route !== currentRoute) {
+      console.log('Navigating from', currentRoute, 'to', route);
+      router.push(route as any);
+    }
+  };
 
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(login)" options={{ headerShown: false }} />
         <Stack.Screen name="(home)" options={{ headerShown: false }} />
         <Stack.Screen name="(register)" options={{ headerShown: false }} />

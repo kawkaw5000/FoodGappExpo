@@ -1,4 +1,4 @@
-const BASE_IP = "192.168.254.144";
+const BASE_IP = "192.168.254.148";
 const EXPRESS_PORT = "5000";
 const ASPNET_PORT = "5129";
 
@@ -7,6 +7,8 @@ const Config = {
   API_BASE: `http://${BASE_IP}:${ASPNET_PORT}`,
   Account_API: `http://${BASE_IP}:${ASPNET_PORT}/api/account`,
   DESCRIBE_IMAGE_API: `http://${BASE_IP}:${EXPRESS_PORT}/describe_image`,
+  NUTRITION_API: `http://${BASE_IP}:${EXPRESS_PORT}/get_nutritional_info`,
+  LOG_FOOD_API: `http://${BASE_IP}:${ASPNET_PORT}/api/foodlogging/log`,
 };
 
 export default Config;
