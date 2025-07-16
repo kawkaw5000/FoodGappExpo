@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, SafeAreaView, StyleSheet, Alert, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Button } from "react-native";
+import { View, Text, SafeAreaView, StyleSheet, Alert, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Button, Modal } from "react-native";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from "../../constants/Config";
+import UserExperienceService from "../../services/UserExperienceService";
+import XPNotification from "../../components/XPNotification";
 
 export default function ScanPage() {
+  const router = useRouter();
   const cameraRef = useRef<CameraView>(null);
-  const [hasPermission, setHasPermission] = useState(null);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [foodName, setFoodName] = useState("");
   const [grams, setGrams] = useState("100");
@@ -14,13 +18,50 @@ export default function ScanPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [cameraType, setCameraType] = useState<CameraType>("back");
+  const [showNutritionModal, setShowNutritionModal] = useState(false);
+  const [nutritionData, setNutritionData] = useState<any>(null);
+  const [loadingNutrition, setLoadingNutrition] = useState(false);
+  
+  // XP Notification states
+  const [showXPNotification, setShowXPNotification] = useState(false);
+  const [xpNotificationData, setXPNotificationData] = useState({
+    xpGained: 0,
+    reason: '',
+    isLevelUp: false,
+    newLevel: 0,
+    isConsecutiveBonus: false,
+    consecutiveDays: 0,
+  });
 
   useEffect(() => {
     (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
+      const permission = await requestCameraPermission();
+      setHasPermission(permission.granted);
     })();
   }, []);
+
+  // Award XP helper function
+  const awardXP = async (amount: number, reason: string) => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        const result = await UserExperienceService.addXP(userId, amount, reason);
+        
+        // Show XP notification
+        setXPNotificationData({
+          xpGained: result.xpGained,
+          reason,
+          isLevelUp: result.leveledUp,
+          newLevel: result.newLevel || 0,
+          isConsecutiveBonus: false,
+          consecutiveDays: 0,
+        });
+        setShowXPNotification(true);
+      }
+    } catch (error) {
+      console.error('Error awarding XP:', error);
+    }
+  };
 
   // Scan button handler
   const handleScan = async () => {
@@ -47,6 +88,9 @@ export default function ScanPage() {
       if (res.ok && data.description) {
         const name = data.description.split(":").pop()?.trim() || "";
         setFoodName(name);
+        
+        // Award XP for scanning
+        await awardXP(UserExperienceService.XP_REWARDS.SCAN_FOOD, 'Food Scanned');
       } else {
         Alert.alert("Detection Failed", "Could not detect food. Please enter manually.");
       }
@@ -57,39 +101,197 @@ export default function ScanPage() {
     }
   };
 
-  // Submit button handler
+  // Submit button handler - now shows nutrition first
   const handleSubmit = async () => {
     if (!foodName || !grams) {
       Alert.alert("Missing Info", "Please enter food name and grams.");
       return;
     }
+    setLoadingNutrition(true);
+    try {
+      // Get nutritional information first - format for your Python API
+      const nutritionPayload = {
+        items: [
+          {
+            foodName: foodName,
+            grams: parseFloat(grams)
+          }
+        ],
+        body_goal: "maintain weight", // You can get this from user profile later
+        date: new Date().toISOString()
+      };
+      
+      console.log("Nutrition API Payload:", nutritionPayload);
+      
+      const nutritionRes = await fetch(Config.NUTRITION_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nutritionPayload),
+      });
+      
+      console.log("Nutrition API Response status:", nutritionRes.status);
+      const nutritionRawText = await nutritionRes.text();
+      console.log("Nutrition API Raw response:", nutritionRawText);
+      
+      if (nutritionRes.ok) {
+        const nutritionResponse = JSON.parse(nutritionRawText);
+        console.log("Parsed nutrition response:", nutritionResponse);
+        
+        // Parse the text response from your AI to extract nutrition values
+        const nutritionText = nutritionResponse.nutritional_info;
+        const parsedNutrition = parseNutritionText(nutritionText);
+        console.log("Parsed nutrition data:", parsedNutrition);
+        
+        setNutritionData(parsedNutrition);
+        setShowNutritionModal(true);
+      } else {
+        Alert.alert("Error", "Failed to get nutritional information.");
+      }
+    } catch (e) {
+      console.error("Error getting nutrition:", e);
+      Alert.alert("Error", "Failed to get nutritional information.");
+    } finally {
+      setLoadingNutrition(false);
+    }
+  };
+
+  // Actual logging function called from nutrition modal
+  const handleConfirmLog = async () => {
     setLoading(true);
     try {
-      const userId = await AsyncStorage.getItem("userId");
+      // Map meal type to category ID for backend
+      const foodCategoryId = mealType === "Breakfast" ? 1 : 
+                           mealType === "Lunch" ? 2 : 
+                           mealType === "Dinner" ? 3 : 1;
+
+      // Use the logScannedFood endpoint which accepts nutrition data directly
       const payload = {
         foodName,
         grams: parseFloat(grams),
-        mealType,
-        userId: userId ? parseInt(userId) : undefined,
+        calories: nutritionData?.calories?.toString() || "0",
+        protein: nutritionData?.protein?.toString() || "0", 
+        fat: nutritionData?.total_fat?.toString() || "0",
+        mealType: mealType // Added mealType to match backend
       };
-      const res = await fetch(Config.LOG_FOOD_API, {
+      
+      console.log("Scanned Food Payload:", payload);
+      
+      const res = await fetch(`${Config.API_BASE}/api/foodlogging/logScannedFood`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json"
+        },
+        credentials: 'include', // Important for authentication
         body: JSON.stringify(payload),
       });
+      
+      console.log("Response status:", res.status);
+      const rawResponseText = await res.text();
+      console.log("Raw response text:", rawResponseText);
+      
       if (res.ok) {
+        const responseData = JSON.parse(rawResponseText);
+        console.log("Response data:", responseData);
+        
+        // Food name is now stored in the Food table, no need for AsyncStorage
+        console.log(`Food "${foodName}" successfully stored in database with Food ID: ${responseData.foodId}`);
+        
+        setShowNutritionModal(false);
         setShowSuccess(true);
         setFoodName("");
         setGrams("100");
         setMealType("Breakfast");
+        setNutritionData(null);
+        
+        // Award XP for food logging
+        await awardXP(UserExperienceService.XP_REWARDS.FOOD_LOG, 'Food Logged');
+        
+        // Navigate back to log page after 2 seconds to show the updated logs
+        setTimeout(() => {
+          setShowSuccess(false);
+          router.back();
+        }, 2000);
       } else {
-        Alert.alert("Error", "Failed to log food.");
+        const errorData = JSON.parse(rawResponseText);
+        Alert.alert("Error", errorData.error || "Failed to log food.");
       }
     } catch (e) {
+      console.error("Error logging food:", e);
       Alert.alert("Error", "Failed to log food.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleNutritionFetch = async () => {
+    setLoadingNutrition(true);
+    try {
+      const res = await fetch(Config.NUTRITION_API + `?food=${encodeURIComponent(foodName)}&grams=${grams}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNutritionData(data);
+        setShowNutritionModal(true);
+      } else {
+        Alert.alert("Error", "Failed to fetch nutrition data.");
+      }
+    } catch (e) {
+      console.error("Error fetching nutrition data:", e);
+      Alert.alert("Error", "Failed to fetch nutrition data.");
+    } finally {
+      setLoadingNutrition(false);
+    }
+  };
+
+  // Parse nutrition text response from AI into structured data
+  const parseNutritionText = (nutritionText: string) => {
+    const nutrition = {
+      calories: 0,
+      protein: 0,
+      total_fat: 0,
+      total_carbohydrate: 0,
+      cholesterol: 0,
+      sodium: 0,
+      dietary_fiber: 0,
+      sugars: 0,
+      vitamin_d: 0,
+      calcium: 0,
+      iron: 0,
+      potassium: 0,
+      vitamin_a: 0,
+      vitamin_c: 0
+    };
+
+    if (!nutritionText) return nutrition;
+
+    // Extract values using regex patterns
+    const extractValue = (pattern: string) => {
+      const patterns = pattern.split('|'); // Handle multiple patterns like "Total Fat|Fat"
+      for (const p of patterns) {
+        const match = nutritionText.match(new RegExp(p + ':\\s*(\\d+(?:\\.\\d+)?)', 'i'));
+        if (match) return parseFloat(match[1]);
+      }
+      return 0;
+    };
+
+    nutrition.calories = extractValue('Calories');
+    nutrition.protein = extractValue('Protein');
+    nutrition.total_fat = extractValue('Total Fat|Fat'); // Handle both "Total Fat" and "Fat"
+    nutrition.total_carbohydrate = extractValue('Total Carbohydrates|Carbohydrates|Carbs');
+    nutrition.cholesterol = extractValue('Cholesterol');
+    nutrition.sodium = extractValue('Sodium');
+    nutrition.dietary_fiber = extractValue('Dietary Fiber');
+    nutrition.sugars = extractValue('Sugar');
+    nutrition.vitamin_d = extractValue('Vitamin D');
+    nutrition.calcium = extractValue('Calcium');
+    nutrition.iron = extractValue('Iron');
+    nutrition.potassium = extractValue('Potassium');
+    nutrition.vitamin_a = extractValue('Vitamin A');
+    nutrition.vitamin_c = extractValue('Vitamin C');
+
+    return nutrition;
   };
 
   if (!cameraPermission) {
@@ -179,15 +381,142 @@ export default function ScanPage() {
             accessibilityLabel="Add to Log"
             testID="submitButton"
           >
-            <Text style={styles.submitButtonText}>Add to Log</Text>
+            {loadingNutrition ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>Add to Log</Text>
+            )}
           </TouchableOpacity>
         </View>
+        
+        {/* Nutrition Modal */}
+        <Modal visible={showNutritionModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.nutritionContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{foodName}</Text>
+                <TouchableOpacity onPress={() => setShowNutritionModal(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.nutritionContent}>
+                <Text style={styles.servingSize}>Serving Size (grams): {grams}</Text>
+                <Text style={styles.mealType}>Meal: {mealType}</Text>
+                
+                {loadingNutrition ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#4CAF50" />
+                    <Text style={styles.loadingText}>Getting nutrition information...</Text>
+                  </View>
+                ) : nutritionData ? (
+                  <>
+                    <View style={styles.caloriesSection}>
+                      <Text style={styles.caloriesText}>{Math.round(nutritionData.calories || 0)} cal</Text>
+                    </View>
+                    
+                    <View style={styles.macrosSection}>
+                      <View style={styles.macroItem}>
+                        <Text style={styles.macroLabel}>Protein</Text>
+                        <Text style={[styles.macroValue, {color: '#FF5722'}]}>{Math.round(nutritionData.protein || 0)}g</Text>
+                      </View>
+                      <View style={styles.macroItem}>
+                        <Text style={styles.macroLabel}>Fats</Text>
+                        <Text style={[styles.macroValue, {color: '#FF9800'}]}>{Math.round(nutritionData.total_fat || 0)}g</Text>
+                      </View>
+                      <View style={styles.macroItem}>
+                        <Text style={styles.macroLabel}>Carbs</Text>
+                        <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{Math.round(nutritionData.total_carbohydrate || 0)}g</Text>
+                      </View>
+                    </View>
+                    
+                    <Text style={styles.nutritionFactsTitle}>Nutrition facts</Text>
+                    <View style={styles.nutritionFacts}>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Cholesterol</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.cholesterol || 0)}mg</Text>
+                      </View>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Sodium</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.sodium || 0)}mg</Text>
+                      </View>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Dietary Fiber</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.dietary_fiber || 0)}g</Text>
+                      </View>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Sugar</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.sugars || 0)}g</Text>
+                      </View>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Vitamin D</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.vitamin_d || 0)}mcg</Text>
+                      </View>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Calcium</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.calcium || 0)}mg</Text>
+                      </View>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Iron</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.iron || 0)}mg</Text>
+                      </View>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Potassium</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.potassium || 0)}mg</Text>
+                      </View>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Vitamin A</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.vitamin_a || 0)}mcg</Text>
+                      </View>
+                      <View style={styles.nutrientRow}>
+                        <Text style={styles.nutrientName}>Vitamin C</Text>
+                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.vitamin_c || 0)}mg</Text>
+                      </View>
+                    </View>
+                  </>
+                ) : (
+                  <Text style={styles.errorText}>No nutrition data available</Text>
+                )}
+              </ScrollView>
+              
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  (!nutritionData || loadingNutrition) && styles.disabledButton
+                ]}
+                onPress={handleConfirmLog}
+                disabled={loading || !nutritionData || loadingNutrition}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Confirm & Add to Log</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+        
         {showSuccess && (
           <View style={styles.successBox}>
             <Text style={styles.successText}>Food logged successfully!</Text>
           </View>
         )}
+
+
       </ScrollView>
+      
+      {/* XP Notification */}
+      <XPNotification
+        visible={showXPNotification}
+        xpGained={xpNotificationData.xpGained}
+        reason={xpNotificationData.reason}
+        isLevelUp={xpNotificationData.isLevelUp}
+        newLevel={xpNotificationData.newLevel}
+        isConsecutiveBonus={xpNotificationData.isConsecutiveBonus}
+        consecutiveDays={xpNotificationData.consecutiveDays}
+        onAnimationComplete={() => setShowXPNotification(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -262,4 +591,139 @@ const styles = StyleSheet.create({
   },
   successText: { color: "#388e3c", fontWeight: "bold", fontSize: 16 },
   permissionText: { fontSize: 16, marginBottom: 10, textAlign: "center" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  nutritionContainer: {
+    backgroundColor: "#fff",
+    width: "95%",
+    height: "85%",
+    borderRadius: 15,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    backgroundColor: "#f8f8f8",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  cancelText: {
+    fontSize: 16,
+    color: "#FF5722",
+    fontWeight: "600",
+  },
+  nutritionContent: {
+    flex: 1,
+    padding: 20,
+  },
+  servingSize: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 5,
+  },
+  mealType: {
+    fontSize: 16,
+    color: "#4CAF50",
+    fontWeight: "600",
+    marginBottom: 20,
+  },
+  caloriesSection: {
+    backgroundColor: "#f5f5f5",
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    alignItems: "center",
+  },
+  caloriesText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  macrosSection: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 20,
+  },
+  macroItem: {
+    alignItems: "center",
+  },
+  macroLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 5,
+  },
+  macroValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  nutritionFactsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 15,
+  },
+  nutritionFacts: {
+    marginBottom: 20,
+  },
+  nutrientRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  nutrientName: {
+    fontSize: 14,
+    color: "#666",
+  },
+  nutrientValue: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "500",
+  },
+  confirmButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 15,
+    alignItems: "center",
+    margin: 20,
+    borderRadius: 10,
+  },
+  confirmButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#666",
+    marginTop: 10,
+    textAlign: "center",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#FF5722",
+    textAlign: "center",
+    marginVertical: 20,
+  },
+  disabledButton: {
+    backgroundColor: "#ccc",
+    opacity: 0.6,
+  },
 });

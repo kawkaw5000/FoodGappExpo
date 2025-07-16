@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image, ImageSourcePropType, StyleProp, ViewStyle, TextStyle, ImageStyle, StyleSheet } from 'react-native';
-import { NavImg } from "@/constants/NavImg";
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, Image, ImageSourcePropType, StyleSheet, Animated, Dimensions } from 'react-native';
+
 interface NavItem {
   name: string;
   route: string;
@@ -15,43 +15,162 @@ interface BottomNavBarProps {
 }
 
 const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handleNav }) => {
+  const animationValues = useRef<Record<string, Animated.Value>>({});
+  const navItems = NavImg();
+  const screenWidth = Dimensions.get('window').width;
+  const indicatorWidth = screenWidth / navItems.length;
+
+  // Initialize animation values for each nav item
+  useEffect(() => {
+    navItems.forEach((item) => {
+      if (!animationValues.current[item.name]) {
+        animationValues.current[item.name] = new Animated.Value(0);
+      }
+    });
+  }, [navItems]);
+
   // Helper function to check if current route matches the nav item
   const isRouteActive = (navRoute: string, currentPath: string) => {
-    // Remove trailing slashes and normalize
     const normalizedNavRoute = navRoute.replace(/\/$/, '');
     const normalizedCurrentPath = currentPath.replace(/\/$/, '');
     
-    // Check if current path starts with the nav route (for nested routes)
     return normalizedCurrentPath === normalizedNavRoute || 
            normalizedCurrentPath.startsWith(normalizedNavRoute + '/');
   };
 
+  // Get active index for indicator position
+  const getActiveIndex = () => {
+    return navItems.findIndex(item => isRouteActive(item.route, currentRoute));
+  };
+
+  const activeIndex = getActiveIndex();
+  const indicatorPosition = useRef(new Animated.Value(activeIndex * indicatorWidth)).current;
+
+  // Animate indicator position when route changes
+  useEffect(() => {
+    Animated.spring(indicatorPosition, {
+      toValue: activeIndex * indicatorWidth,
+      useNativeDriver: false,
+      tension: 100,
+      friction: 8,
+    }).start();
+  }, [activeIndex, indicatorPosition, indicatorWidth]);
+
+  // Animate icon press
+  const handlePressIn = (itemName: string) => {
+    if (animationValues.current[itemName]) {
+      Animated.spring(animationValues.current[itemName], {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 150,
+        friction: 4,
+      }).start();
+    }
+  };
+
+  const handlePressOut = (itemName: string) => {
+    if (animationValues.current[itemName]) {
+      Animated.spring(animationValues.current[itemName], {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 150,
+        friction: 4,
+      }).start();
+    }
+  };
+
+  const handleNavPress = (route: string, itemName: string) => {
+    handlePressOut(itemName);
+    handleNav(route);
+  };
+
   return (
-    <View style={styles.bottomBar}>
-      {NavImg().map((item) => {
-        const isActive = isRouteActive(item.route, currentRoute);
-        
-        return (
-          <TouchableOpacity
-            key={item.name}
-            style={styles.iconButton}
-            onPress={() => handleNav(item.route)}
-          >
-            <Image
-              source={isActive ? item.highlight : item.icon}
-              style={styles.icon}
-            />
-            <Text
-              style={[
-                styles.iconLabel,
-                isActive && styles.iconLabelActive,
-              ]}
+    <View style={styles.container}>
+      {/* Active Indicator */}
+      <Animated.View 
+        style={[
+          styles.activeIndicator,
+          {
+            width: indicatorWidth * 0.6,
+            left: indicatorPosition.interpolate({
+              inputRange: [0, screenWidth],
+              outputRange: [indicatorWidth * 0.2, screenWidth - (indicatorWidth * 0.2)],
+              extrapolate: 'clamp',
+            }),
+          }
+        ]} 
+      />
+      
+      {/* Navigation Items */}
+      <View style={styles.bottomBar}>
+        {navItems.map((item, index) => {
+          const isActive = isRouteActive(item.route, currentRoute);
+          const animatedValue = animationValues.current[item.name] || new Animated.Value(0);
+          
+          return (
+            <TouchableOpacity
+              key={item.name}
+              style={styles.iconButton}
+              onPress={() => handleNavPress(item.route, item.name)}
+              onPressIn={() => handlePressIn(item.name)}
+              onPressOut={() => handlePressOut(item.name)}
+              activeOpacity={0.8}
             >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+              <Animated.View 
+                style={[
+                  styles.iconContainer,
+                  {
+                    transform: [
+                      {
+                        scale: animatedValue.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 0.9],
+                        }),
+                      },
+                    ],
+                  },
+                  isActive && styles.activeIconContainer,
+                ]}
+              >
+                <Image
+                  source={isActive ? item.highlight : item.icon}
+                  style={[styles.icon, isActive && styles.activeIcon]}
+                />
+              </Animated.View>
+              
+              <Animated.Text
+                style={[
+                  styles.iconLabel,
+                  isActive && styles.iconLabelActive,
+                  {
+                    opacity: animatedValue.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 0.7],
+                    }),
+                  },
+                ]}
+              >
+                {item.name}
+              </Animated.Text>
+              
+              {/* Active dot indicator */}
+              {isActive && (
+                <Animated.View 
+                  style={[
+                    styles.activeDot,
+                    {
+                      opacity: animatedValue.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 0.6],
+                      }),
+                    }
+                  ]} 
+                />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 };
@@ -60,55 +179,86 @@ export default BottomNavBar;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    position: 'relative',
     backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#E8E8E8",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  
+  activeIndicator: {
+    position: 'absolute',
+    top: 0,
+    height: 3,
+    backgroundColor: "#FCB647",
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
   },
-  image: {
-    width: 120,
-    height: 120,
-    resizeMode: "contain",
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "#333",
-  },
-  spacer: {
-    flex: 1,
-  },
+  
   bottomBar: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
     width: "100%",
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
+    paddingVertical: 12,
+    paddingBottom: 16,
     backgroundColor: "#fff",
   },
+  
   iconButton: {
     alignItems: "center",
     flex: 1,
+    paddingVertical: 4,
   },
+  
+  iconContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginBottom: 4,
+  },
+  
+  activeIconContainer: {
+    backgroundColor: "rgba(252, 182, 71, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(252, 182, 71, 0.3)",
+  },
+  
   icon: {
+    width: 28,
+    height: 28,
+    resizeMode: "contain",
+  },
+  
+  activeIcon: {
     width: 32,
     height: 32,
-    resizeMode: "contain",
-    marginBottom: 2,
   },
+  
   iconLabel: {
-    fontSize: 12,
-    color: "#333",
+    fontSize: 11,
+    color: "#666",
+    fontWeight: "500",
+    textAlign: "center",
   },
+  
   iconLabelActive: {
     color: "#FCB647",
     fontWeight: "bold",
+    fontSize: 12,
+  },
+  
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#FCB647",
+    marginTop: 2,
   },
 });
