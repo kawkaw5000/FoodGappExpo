@@ -43,34 +43,11 @@ export default function ScanScreen() {
       if (scansData) {
         setRecentScans(JSON.parse(scansData));
       } else {
-        // Demo data for recent scans
-        const demoScans: RecentScan[] = [
-          {
-            id: '1',
-            name: 'Adobo',
-            confidence: 95,
-            calories: 320,
-            scannedDate: new Date().toISOString(),
-          },
-          {
-            id: '2',
-            name: 'Fried Rice',
-            confidence: 87,
-            calories: 280,
-            scannedDate: new Date(Date.now() - 86400000).toISOString(),
-          },
-          {
-            id: '3',
-            name: 'Pancit',
-            confidence: 92,
-            calories: 250,
-            scannedDate: new Date(Date.now() - 172800000).toISOString(),
-          }
-        ];
-        setRecentScans(demoScans);
+        setRecentScans([]);
       }
     } catch (error) {
       console.error('Error loading recent scans:', error);
+      setRecentScans([]);
     }
   };
 

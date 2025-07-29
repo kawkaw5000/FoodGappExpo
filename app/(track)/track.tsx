@@ -15,6 +15,39 @@ interface FoodRecommendation {
 }
 
 export default function TrackPage() {
+  // TODO: Replace with real user profile from context or storage
+  const mockUserProfile = {
+    age: 25,
+    gender: "female",
+    height: 160,
+    weight: 60,
+    body_goal: "maintain weight"
+  };
+
+  // State for personalized recommendations
+  const [recommendations, setRecommendations] = useState<string | string[]>("");
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
+
+  // State for health risk alerts/deficiencies
+  const [deficiency, setDeficiency] = useState<string>("");
+  const [deficiencyLoading, setDeficiencyLoading] = useState(false);
+  const [deficiencyError, setDeficiencyError] = useState<string | null>(null);
+
+  // State for meal plan
+  const [mealPlan, setMealPlan] = useState<string>("");
+  const [mealPlanLoading, setMealPlanLoading] = useState(false);
+  const [mealPlanError, setMealPlanError] = useState<string | null>(null);
+
+  // State for nutrition education
+  const [education, setEducation] = useState<string>("");
+  const [educationLoading, setEducationLoading] = useState(false);
+  const [educationError, setEducationError] = useState<string | null>(null);
+
+  // State for food alternatives
+  const [alternatives, setAlternatives] = useState<string>("");
+  const [alternativesLoading, setAlternativesLoading] = useState(false);
+  const [alternativesError, setAlternativesError] = useState<string | null>(null);
   const router = useRouter();
   const params = useLocalSearchParams();
   const selectedMeal = params.meal as string || "Breakfast";
@@ -148,9 +181,85 @@ export default function TrackPage() {
     }
   };
 
-  const handleAddRecommendation = (food: FoodRecommendation) => {
-    setTrackedFoods(prev => [...prev, food]);
-    Alert.alert("Added to Tracker", `${food.name} has been added to your daily tracker!`);
+  // Fetch nutrition info for a food and add to tracked foods (like food logging)
+  const handleAddRecommendation = async (food: FoodRecommendation) => {
+    try {
+      // Prepare payload for nutrition API (like scan.tsx)
+      const nutritionPayload = {
+        items: [
+          {
+            foodName: food.name,
+            grams: 100 // or allow user to input grams if needed
+          }
+        ],
+        body_goal: "maintain weight",
+        date: new Date().toISOString()
+      };
+
+      const nutritionRes = await fetch(require('../../constants/Config').default.NUTRITION_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nutritionPayload),
+      });
+      const nutritionRawText = await nutritionRes.text();
+      let nutritionResponse: any = {};
+      try {
+        nutritionResponse = JSON.parse(nutritionRawText);
+      } catch (err) {
+        nutritionResponse = {};
+      }
+
+      // Parse nutrition info (Gemini returns Calories, Protein, Fat, no carbs)
+      let parsedNutrition: {calories: number, protein: number, carbs: number, fats: number} = {
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fats: food.fats,
+      };
+      let embeddedJson = null;
+      if (nutritionResponse && typeof nutritionResponse === 'object' && 'nutritional_info' in nutritionResponse && typeof nutritionResponse.nutritional_info === 'string') {
+        let info = nutritionResponse.nutritional_info.trim();
+        if (info.startsWith('```json')) {
+          info = info.replace(/```json|```/g, '').trim();
+        }
+        try {
+          embeddedJson = JSON.parse(info);
+        } catch (err) {
+          embeddedJson = null;
+        }
+      }
+      if (embeddedJson && Array.isArray(embeddedJson.foods) && embeddedJson.foods.length > 0) {
+        const foodObj = embeddedJson.foods[0];
+        parsedNutrition = {
+          calories: foodObj.Calories ?? 0,
+          protein: foodObj.Protein ?? 0,
+          carbs: 0, // Gemini does not return carbs, set to 0
+          fats: foodObj.Fat ?? 0,
+        };
+      } else if (nutritionResponse && typeof nutritionResponse === 'object' && 'total_nutrients' in nutritionResponse && nutritionResponse.total_nutrients) {
+        parsedNutrition = {
+          calories: nutritionResponse.total_nutrients.calories ?? 0,
+          protein: nutritionResponse.total_nutrients.protein ?? 0,
+          carbs: nutritionResponse.total_nutrients.carbohydrates ?? nutritionResponse.total_nutrients.total_carbohydrate ?? 0,
+          fats: nutritionResponse.total_nutrients.total_fat ?? nutritionResponse.total_nutrients.fat ?? 0,
+        };
+      }
+
+      // Add to tracked foods with nutrition info
+      setTrackedFoods(prev => [
+        ...prev,
+        {
+          ...food,
+          calories: parsedNutrition.calories,
+          protein: parsedNutrition.protein,
+          carbs: parsedNutrition.carbs,
+          fats: parsedNutrition.fats,
+        }
+      ]);
+      Alert.alert("Added to Tracker", `${food.name} has been added to your daily tracker!`);
+    } catch (e) {
+      Alert.alert("Error", "Failed to fetch nutrition info for this food.");
+    }
   };
 
   const getCurrentDateString = () => {
@@ -162,11 +271,154 @@ export default function TrackPage() {
     });
   };
 
-  const getTotalCalories = () => {
-    return trackedFoods.reduce((total, food) => total + food.calories, 0);
+  // Calculate daily macros
+  const getTotalMacros = () => {
+    return trackedFoods.reduce(
+      (totals, food) => ({
+        calories: totals.calories + (food.calories || 0),
+        protein: totals.protein + (food.protein || 0),
+        carbs: totals.carbs + (food.carbs || 0),
+        fats: totals.fats + (food.fats || 0),
+      }),
+      { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    );
   };
+  const totalMacros = getTotalMacros();
 
-  const recommendations = getMealRecommendations(selectedMeal);
+
+  // Fetch all dashboard data when trackedFoods change
+  useEffect(() => {
+    // 1. Personalized Recommendations
+    const fetchRecommendations = async () => {
+      setRecommendationsLoading(true);
+      setRecommendationsError(null);
+      try {
+        const res = await fetch(require('../../constants/Config').default.API_BASE + '/personalized_recommendations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_profile: mockUserProfile,
+            current_nutrition: trackedFoods
+          })
+        });
+        const data = await res.json();
+        let recs = data.recommendations || "No recommendations available.";
+        // Try to parse as array if possible
+        if (typeof recs === 'string') {
+          // Try splitting by newlines or numbered/bulleted list
+          const lines = recs.split(/\n|\r|\d+\. |\- /).map(s => s.trim()).filter(Boolean);
+          if (lines.length > 1) {
+            setRecommendations(lines);
+          } else {
+            setRecommendations(recs);
+          }
+        } else if (Array.isArray(recs)) {
+          setRecommendations(recs);
+        } else {
+          setRecommendations("No recommendations available.");
+        }
+      } catch (e) {
+        setRecommendationsError("Failed to fetch recommendations.");
+      } finally {
+        setRecommendationsLoading(false);
+      }
+    };
+
+    // 2. Health Risk Alerts / Deficiencies
+    const fetchDeficiency = async () => {
+      setDeficiencyLoading(true);
+      setDeficiencyError(null);
+      try {
+        const res = await fetch(require('../../constants/Config').default.API_BASE + '/analyze_deficiencies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...mockUserProfile,
+            daily_nutrition: trackedFoods
+          })
+        });
+        const data = await res.json();
+        setDeficiency(data.deficiency_analysis || "No health risk alerts or deficiencies detected today.");
+      } catch (e) {
+        setDeficiencyError("Failed to fetch deficiency analysis.");
+      } finally {
+        setDeficiencyLoading(false);
+      }
+    };
+
+    // 3. Meal Plan
+    const fetchMealPlan = async () => {
+      setMealPlanLoading(true);
+      setMealPlanError(null);
+      try {
+        const res = await fetch(require('../../constants/Config').default.API_BASE + '/generate_meal_plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_profile: mockUserProfile,
+            duration_days: 7
+          })
+        });
+        const data = await res.json();
+        setMealPlan(data.meal_plan || "No meal plan available.");
+      } catch (e) {
+        setMealPlanError("Failed to fetch meal plan.");
+      } finally {
+        setMealPlanLoading(false);
+      }
+    };
+
+    // 4. Nutrition Education
+    const fetchEducation = async () => {
+      setEducationLoading(true);
+      setEducationError(null);
+      try {
+        const res = await fetch(require('../../constants/Config').default.API_BASE + '/nutrition_education', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: "basic_nutrition",
+            level: "beginner"
+          })
+        });
+        const data = await res.json();
+        setEducation(data.education_content || "No education content available.");
+      } catch (e) {
+        setEducationError("Failed to fetch nutrition education.");
+      } finally {
+        setEducationLoading(false);
+      }
+    };
+
+    // 5. Food Alternatives
+    const fetchAlternatives = async () => {
+      setAlternativesLoading(true);
+      setAlternativesError(null);
+      try {
+        const res = await fetch(require('../../constants/Config').default.API_BASE + '/local_food_alternatives', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target_nutrients: ["protein", "iron"],
+            dietary_restrictions: null
+          })
+        });
+        const data = await res.json();
+        setAlternatives(data.food_alternatives || "No food alternatives available.");
+      } catch (e) {
+        setAlternativesError("Failed to fetch food alternatives.");
+      } finally {
+        setAlternativesLoading(false);
+      }
+    };
+
+    fetchRecommendations();
+    fetchDeficiency();
+    fetchMealPlan();
+    fetchEducation();
+    fetchAlternatives();
+  }, [trackedFoods]);
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -189,10 +441,113 @@ export default function TrackPage() {
         {/* Daily Progress */}
         <View style={styles.progressSection}>
           <View style={styles.progressCircle}>
-            <Text style={styles.progressText}>{getTotalCalories()}</Text>
-            <Text style={styles.progressSubText}>/ {dailyGoal} kcal</Text>
+            <Text style={styles.progressText}>{Number(totalMacros.calories).toFixed(1)}</Text>
+            <Text style={styles.progressSubText}>/ {Number(dailyGoal).toFixed(1)} kcal</Text>
           </View>
           <Text style={styles.progressLabel}>Today's Intake</Text>
+          <View style={styles.macrosRow}>
+            <View style={styles.macroBox}>
+              <Text style={styles.macroLabel}>Protein</Text>
+              <Text style={styles.macroValue}>{Number(totalMacros.protein).toFixed(1)}g</Text>
+            </View>
+            <View style={styles.macroBox}>
+              <Text style={styles.macroLabel}>Carbs</Text>
+              <Text style={styles.macroValue}>{Number(totalMacros.carbs).toFixed(1)}g</Text>
+            </View>
+            <View style={styles.macroBox}>
+              <Text style={styles.macroLabel}>Fats</Text>
+              <Text style={styles.macroValue}>{Number(totalMacros.fats).toFixed(1)}g</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Health Risk Alerts / Deficiencies */}
+        <View style={{paddingHorizontal: 20, marginBottom: 20}}>
+          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#D32F2F', marginBottom: 8}}>
+            Health Risk Alerts / Deficiencies
+          </Text>
+          <View style={{backgroundColor: '#FFF3E0', borderRadius: 8, padding: 12, minHeight: 48, justifyContent: 'center'}}>
+            {deficiencyLoading ? (
+              <Text style={{color: '#D32F2F', fontSize: 14}}>Loading...</Text>
+            ) : deficiencyError ? (
+              <Text style={{color: '#D32F2F', fontSize: 14}}>{deficiencyError}</Text>
+            ) : (
+              <Text style={{color: '#D32F2F', fontSize: 14}}>{deficiency}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Personalized Recommendations */}
+        <View style={{paddingHorizontal: 20, marginBottom: 20}}>
+          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1976D2', marginBottom: 8}}>
+            Personalized Recommendations
+          </Text>
+          <View style={{backgroundColor: '#E3F2FD', borderRadius: 8, padding: 12, minHeight: 48, justifyContent: 'center'}}>
+            {recommendationsLoading ? (
+              <Text style={{color: '#1976D2', fontSize: 14}}>Loading...</Text>
+            ) : recommendationsError ? (
+              <Text style={{color: '#D32F2F', fontSize: 14}}>{recommendationsError}</Text>
+            ) : Array.isArray(recommendations) ? (
+              <View>
+                {recommendations.map((rec, idx) => (
+                  <View key={idx} style={{flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4}}>
+                    <Text style={{color: '#1976D2', fontSize: 16, marginRight: 6}}>{'•'}</Text>
+                    <Text style={{color: '#1976D2', fontSize: 14, flex: 1}}>{rec}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={{color: '#1976D2', fontSize: 14}}>{recommendations}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Meal Plan */}
+        <View style={{paddingHorizontal: 20, marginBottom: 20}}>
+          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#388E3C', marginBottom: 8}}>
+            Meal Plan
+          </Text>
+          <View style={{backgroundColor: '#E8F5E9', borderRadius: 8, padding: 12, minHeight: 48, justifyContent: 'center'}}>
+            {mealPlanLoading ? (
+              <Text style={{color: '#388E3C', fontSize: 14}}>Loading...</Text>
+            ) : mealPlanError ? (
+              <Text style={{color: '#D32F2F', fontSize: 14}}>{mealPlanError}</Text>
+            ) : (
+              <Text style={{color: '#388E3C', fontSize: 14}}>{mealPlan}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Nutrition Education */}
+        <View style={{paddingHorizontal: 20, marginBottom: 20}}>
+          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#FBC02D', marginBottom: 8}}>
+            Nutrition Education
+          </Text>
+          <View style={{backgroundColor: '#FFFDE7', borderRadius: 8, padding: 12, minHeight: 48, justifyContent: 'center'}}>
+            {educationLoading ? (
+              <Text style={{color: '#FBC02D', fontSize: 14}}>Loading...</Text>
+            ) : educationError ? (
+              <Text style={{color: '#D32F2F', fontSize: 14}}>{educationError}</Text>
+            ) : (
+              <Text style={{color: '#FBC02D', fontSize: 14}}>{education}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Food Alternatives */}
+        <View style={{paddingHorizontal: 20, marginBottom: 20}}>
+          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#7B1FA2', marginBottom: 8}}>
+            Food Alternatives
+          </Text>
+          <View style={{backgroundColor: '#F3E5F5', borderRadius: 8, padding: 12, minHeight: 48, justifyContent: 'center'}}>
+            {alternativesLoading ? (
+              <Text style={{color: '#7B1FA2', fontSize: 14}}>Loading...</Text>
+            ) : alternativesError ? (
+              <Text style={{color: '#D32F2F', fontSize: 14}}>{alternativesError}</Text>
+            ) : (
+              <Text style={{color: '#7B1FA2', fontSize: 14}}>{alternatives}</Text>
+            )}
+          </View>
         </View>
 
         {/* Meal Selection */}
@@ -222,33 +577,31 @@ export default function TrackPage() {
         {/* Filipino Food Recommendations */}
         <View style={styles.recommendationsSection}>
           <Text style={styles.sectionTitle}>Filipino Food Recommendations</Text>
-          {recommendations.map((food) => (
+          {Array.isArray(recommendations) && recommendations.map((food: any) => (
             <View key={food.id} style={styles.foodCard}>
               <View style={styles.foodInfo}>
                 <Text style={styles.foodName}>{food.name}</Text>
                 <Text style={styles.foodDescription}>{food.description}</Text>
                 <Text style={styles.foodCategory}>{food.category}</Text>
-                
                 <View style={styles.nutritionRow}>
                   <View style={styles.nutritionItem}>
                     <Text style={styles.nutritionLabel}>Calories</Text>
-                    <Text style={styles.nutritionValue}>{food.calories}</Text>
+                    <Text style={styles.nutritionValue}>{Number(food.calories).toFixed(1)}</Text>
                   </View>
                   <View style={styles.nutritionItem}>
                     <Text style={styles.nutritionLabel}>Protein</Text>
-                    <Text style={styles.nutritionValue}>{food.protein}g</Text>
+                    <Text style={styles.nutritionValue}>{Number(food.protein).toFixed(1)}g</Text>
                   </View>
                   <View style={styles.nutritionItem}>
                     <Text style={styles.nutritionLabel}>Carbs</Text>
-                    <Text style={styles.nutritionValue}>{food.carbs}g</Text>
+                    <Text style={styles.nutritionValue}>{Number(food.carbs).toFixed(1)}g</Text>
                   </View>
                   <View style={styles.nutritionItem}>
                     <Text style={styles.nutritionLabel}>Fats</Text>
-                    <Text style={styles.nutritionValue}>{food.fats}g</Text>
+                    <Text style={styles.nutritionValue}>{Number(food.fats).toFixed(1)}g</Text>
                   </View>
                 </View>
               </View>
-              
               <TouchableOpacity 
                 style={styles.addButton}
                 onPress={() => handleAddRecommendation(food)}
@@ -266,7 +619,7 @@ export default function TrackPage() {
             {trackedFoods.map((food, index) => (
               <View key={`${food.id}-${index}`} style={styles.trackedItem}>
                 <Text style={styles.trackedName}>{food.name}</Text>
-                <Text style={styles.trackedCalories}>{food.calories} kcal</Text>
+                <Text style={styles.trackedCalories}>{Number(food.calories).toFixed(1)} kcal</Text>
               </View>
             ))}
           </View>
@@ -276,6 +629,26 @@ export default function TrackPage() {
   );
 }
 const styles = StyleSheet.create({
+  macrosRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  macroBox: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  macroLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  macroValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   container: {
     flex: 1,
     backgroundColor: "#fff",

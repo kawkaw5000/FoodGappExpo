@@ -69,9 +69,8 @@ export default function EditProfileScreen() {
     }
     setLoading(true);
     try {
-      // const safeUserInfoId = userInfoId || 1;
       const safeBodyGoalId = bodyGoalId || 1;
-      const payload = {    
+      const payload = {
         firstName,
         lastName,
         age: Number(age),
@@ -79,7 +78,8 @@ export default function EditProfileScreen() {
         height: Number(height),
         bodyGoalId: safeBodyGoalId
       };
-      const response = await fetch(`${Config.Account_API}/updateUserInfo`, {
+      // Use the correct endpoint for updating user account
+      const response = await fetch(`${Config.Account_API}/updateAccount`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -95,7 +95,7 @@ export default function EditProfileScreen() {
       setLoading(false);
       if ((data && data.message && data.message.toLowerCase().includes("success")) || response.ok) {
         Alert.alert("Success", "Profile updated successfully.", [
-          { text: "OK", onPress: () => router.back() }
+          { text: "OK", onPress: () => router.replace("/(profile)/profile") }
         ]);
       } else {
         Alert.alert("Error", (data && data.message) || "Failed to update profile.");

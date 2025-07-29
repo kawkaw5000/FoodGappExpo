@@ -1,3 +1,4 @@
+// ...existing code...
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, SafeAreaView, StyleSheet, Alert, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Button, Modal } from "react-native";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
@@ -120,38 +121,49 @@ export default function ScanPage() {
         body_goal: "maintain weight", // You can get this from user profile later
         date: new Date().toISOString()
       };
-      
-      console.log("Nutrition API Payload:", nutritionPayload);
-      
+      console.log("[Nutrition] Outgoing payload:", nutritionPayload);
+
       const nutritionRes = await fetch(Config.NUTRITION_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(nutritionPayload),
       });
-      
-      console.log("Nutrition API Response status:", nutritionRes.status);
+
       const nutritionRawText = await nutritionRes.text();
-      console.log("Nutrition API Raw response:", nutritionRawText);
-      
+      console.log("[Nutrition] Raw response text:", nutritionRawText);
       if (nutritionRes.ok) {
         const nutritionResponse = JSON.parse(nutritionRawText);
-        console.log("Parsed nutrition response:", nutritionResponse);
-        
-        // Parse the text response from your AI to extract nutrition values
-        const nutritionText = nutritionResponse.nutritional_info;
-        const parsedNutrition = parseNutritionText(nutritionText);
-        console.log("Parsed nutrition data:", parsedNutrition);
-        
-        setNutritionData(parsedNutrition);
-        setShowNutritionModal(true);
+        console.log("[Nutrition] Parsed response:", nutritionResponse);
+        // Use new backend: always expect foods array
+        let foodObj = null;
+        if (nutritionResponse.foods && Array.isArray(nutritionResponse.foods) && nutritionResponse.foods.length > 0) {
+          foodObj = nutritionResponse.foods[0];
+        }
+        if (foodObj && (
+          Number(foodObj.Calories ?? 0) > 0 ||
+          Number(foodObj.Protein ?? 0) > 0 ||
+          Number(foodObj.Fat ?? 0) > 0 ||
+          Number(foodObj.Carbs ?? 0) > 0
+        )) {
+          setNutritionData({
+            calories: Number(foodObj.Calories ?? 0),
+            protein: Number(foodObj.Protein ?? 0),
+            fats: Number(foodObj.Fat ?? 0),
+            carbs: Number(foodObj.Carbs ?? 0)
+          });
+          setShowNutritionModal(true);
+        } else {
+          // Show a temporary alert and do not show modal
+          Alert.alert("No nutrition data found for this food.");
+          setTimeout(() => setLoadingNutrition(false), 1200);
+        }
       } else {
         Alert.alert("Error", "Failed to get nutritional information.");
       }
     } catch (e) {
-      console.error("Error getting nutrition:", e);
       Alert.alert("Error", "Failed to get nutritional information.");
     } finally {
-      setLoadingNutrition(false);
+      if (!loadingNutrition) setLoadingNutrition(false);
     }
   };
 
@@ -193,9 +205,29 @@ export default function ScanPage() {
         const responseData = JSON.parse(rawResponseText);
         console.log("Response data:", responseData);
         
-        // Food name is now stored in the Food table, no need for AsyncStorage
-        console.log(`Food "${foodName}" successfully stored in database with Food ID: ${responseData.foodId}`);
-        
+        // Add to local recentScans in AsyncStorage
+        try {
+          const scanEntry = {
+            id: Date.now().toString(),
+            name: foodName,
+            confidence: 100, // or use a real value if available
+            calories: Number(nutritionData?.calories || 0),
+            scannedDate: new Date().toISOString(),
+            // image: photoUri (if available)
+          };
+          const existing = await AsyncStorage.getItem('recentScans');
+          let arr = [];
+          if (existing) {
+            arr = JSON.parse(existing);
+          }
+          arr.unshift(scanEntry);
+          // Optionally limit to last 10
+          if (arr.length > 10) arr = arr.slice(0, 10);
+          await AsyncStorage.setItem('recentScans', JSON.stringify(arr));
+        } catch (err) {
+          console.error('Failed to update recentScans:', err);
+        }
+
         setShowNutritionModal(false);
         setShowSuccess(true);
         setFoodName("");
@@ -343,7 +375,7 @@ export default function ScanPage() {
             onChangeText={setFoodName}
             testID="foodNameInput"
           />
-          <Text style={styles.label}>Grams</Text>
+          <Text style={styles.label}>Edible Part (Grams)</Text>
           <TextInput
             style={styles.input}
             placeholder="100"
@@ -399,11 +431,9 @@ export default function ScanPage() {
                   <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
-              
               <ScrollView style={styles.nutritionContent}>
-                <Text style={styles.servingSize}>Serving Size (grams): {grams}</Text>
+                <Text style={styles.servingSize}>Edible Portion (grams): {grams}</Text>
                 <Text style={styles.mealType}>Meal: {mealType}</Text>
-                
                 {loadingNutrition ? (
                   <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#4CAF50" />
@@ -412,65 +442,26 @@ export default function ScanPage() {
                 ) : nutritionData ? (
                   <>
                     <View style={styles.caloriesSection}>
-                      <Text style={styles.caloriesText}>{Math.round(nutritionData.calories || 0)} cal</Text>
+                      <Text style={styles.caloriesText}>{Number(nutritionData.calories || 0).toFixed(1)} cal</Text>
                     </View>
-                    
                     <View style={styles.macrosSection}>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Protein</Text>
-                        <Text style={[styles.macroValue, {color: '#FF5722'}]}>{Math.round(nutritionData.protein || 0)}g</Text>
+                        <Text style={[styles.macroValue, {color: '#FF5722'}]}>{Number(
+                          nutritionData.protein ?? nutritionData.Protein ?? 0
+                        ).toFixed(1)}g</Text>
                       </View>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Fats</Text>
-                        <Text style={[styles.macroValue, {color: '#FF9800'}]}>{Math.round(nutritionData.total_fat || 0)}g</Text>
+                        <Text style={[styles.macroValue, {color: '#FF9800'}]}>{Number(
+                          nutritionData.fats ?? nutritionData.fat ?? nutritionData.Fat ?? 0
+                        ).toFixed(1)}g</Text>
                       </View>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Carbs</Text>
-                        <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{Math.round(nutritionData.total_carbohydrate || 0)}g</Text>
-                      </View>
-                    </View>
-                    
-                    <Text style={styles.nutritionFactsTitle}>Nutrition facts</Text>
-                    <View style={styles.nutritionFacts}>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Cholesterol</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.cholesterol || 0)}mg</Text>
-                      </View>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Sodium</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.sodium || 0)}mg</Text>
-                      </View>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Dietary Fiber</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.dietary_fiber || 0)}g</Text>
-                      </View>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Sugar</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.sugars || 0)}g</Text>
-                      </View>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Vitamin D</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.vitamin_d || 0)}mcg</Text>
-                      </View>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Calcium</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.calcium || 0)}mg</Text>
-                      </View>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Iron</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.iron || 0)}mg</Text>
-                      </View>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Potassium</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.potassium || 0)}mg</Text>
-                      </View>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Vitamin A</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.vitamin_a || 0)}mcg</Text>
-                      </View>
-                      <View style={styles.nutrientRow}>
-                        <Text style={styles.nutrientName}>Vitamin C</Text>
-                        <Text style={styles.nutrientValue}>{Math.round(nutritionData.vitamin_c || 0)}mg</Text>
+                        <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{Number(
+                          nutritionData.carbs ?? nutritionData.carbohydrates ?? nutritionData.Carbs ?? 0
+                        ).toFixed(1)}g</Text>
                       </View>
                     </View>
                   </>
@@ -478,7 +469,6 @@ export default function ScanPage() {
                   <Text style={styles.errorText}>No nutrition data available</Text>
                 )}
               </ScrollView>
-              
               <TouchableOpacity
                 style={[
                   styles.confirmButton,
@@ -493,6 +483,7 @@ export default function ScanPage() {
                   <Text style={styles.confirmButtonText}>Confirm & Add to Log</Text>
                 )}
               </TouchableOpacity>
+
             </View>
           </View>
         </Modal>
@@ -522,6 +513,15 @@ export default function ScanPage() {
 }
 
 const styles = StyleSheet.create({
+  nutritionContainer: {
+    backgroundColor: "#fff",
+    width: "95%",
+    height: "85%",
+    borderRadius: 15,
+    overflow: "hidden",
+    alignSelf: 'center',
+    justifyContent: 'flex-start',
+  },
   container: { flex: 1, backgroundColor: "#fff" },
   scrollContent: { alignItems: "center", paddingBottom: 40 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -597,13 +597,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  nutritionContainer: {
-    backgroundColor: "#fff",
-    width: "95%",
-    height: "85%",
-    borderRadius: 15,
-    overflow: "hidden",
-  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -626,6 +619,10 @@ const styles = StyleSheet.create({
   nutritionContent: {
     flex: 1,
     padding: 20,
+  },
+  nutritionContentSmall: {
+    padding: 20,
+    flexGrow: 0,
   },
   servingSize: {
     fontSize: 16,

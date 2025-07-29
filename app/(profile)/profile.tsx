@@ -1,3 +1,33 @@
+// Helper function for body goal label
+function bodyGoalLabel(bodyGoalId: number | undefined): string {
+  switch (bodyGoalId) {
+    case 1:
+      return "Weight Loss";
+    case 2:
+      return "Maintain Weight";
+    case 3:
+      return "Gain Weight";
+    default:
+      return "Not set";
+  }
+}
+
+function isValidNumber(val: any): boolean {
+  if (val === null || val === undefined) return false;
+  if (typeof val === 'string' && val.trim() === '') return false;
+  const num = Number(val);
+  return typeof num === 'number' && !isNaN(num);
+}
+
+function getFullName(firstName: any, lastName: any): string {
+  const first = (typeof firstName === 'string' && firstName.trim()) ? firstName.trim() : '';
+  const last = (typeof lastName === 'string' && lastName.trim()) ? lastName.trim() : '';
+  if (first && last) return `${first} ${last}`;
+  if (first) return first;
+  if (last) return last;
+  return 'Not set';
+}
+
 import React, { useEffect, useState, useCallback } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, SafeAreaView, StyleSheet, Image, TouchableOpacity, ScrollView, Alert } from "react-native";
@@ -38,32 +68,53 @@ export default function ProfilePage() {
     consecutiveDays: 0,
   });
 
-  // Extract fetchProfile so it can be called on demand
+  // Extract fetchProfile so it can be called on demand - using same logic as editProfile
   const fetchProfile = async () => {
     try {
       setLoading(true);
       setError(null);
-      const userId = await AsyncStorage.getItem('userId');
-      const userInfoId = await AsyncStorage.getItem('userInfoId');
-      console.log('ProfilePage: userId:', userId, 'userInfoId:', userInfoId); // Debug log
-      if (!userId) {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      console.log('ProfilePage: userId:', storedUserId); // Debug log
+      if (!storedUserId) {
         setError("No userId found. Please log in again.");
         setLoading(false);
         return;
       }
-      let url = `${Config.Account_API}/getProfile?userId=${encodeURIComponent(userId)}`;
-      if (userInfoId) url += `&userInfoId=${encodeURIComponent(userInfoId)}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      console.log('ProfilePage: backend response data:', data); // Debug log
-      const userInfo = data.userInfo || data;
-      setProfile(userInfo);
+      
+      const res = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(storedUserId)}`);
+      console.log('ProfilePage: API response status:', res.status); // Debug log
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('ProfilePage: API error:', errorText);
+        setError("Failed to load profile: " + errorText);
+        setLoading(false);
+        return;
+      }
+      
+      const user = await res.json();
+      console.log('ProfilePage: Raw API response:', JSON.stringify(user, null, 2)); // Enhanced debug log
+      
+      // Set profile data using the same structure as editProfile
+      const profileData = {
+        userId: user.userId,
+        firstName: user.firstName ?? "",
+        lastName: user.lastName ?? "",
+        age: user.age,
+        weight: user.weight,
+        height: user.height,
+        bodyGoalId: user.bodyGoalId
+      };
+      
+      setProfile(profileData);
+      console.log('ProfilePage: Profile set with processed data:', profileData);
 
       // Load user experience data (using device-based local storage)
       const userExp = await UserExperienceService.getUserExperience();
       setUserExperience(userExp);
 
     } catch (err: any) {
+      console.error('ProfilePage: Fetch error:', err);
       setError("Failed to load profile");
     } finally {
       setLoading(false);
@@ -100,7 +151,7 @@ export default function ProfilePage() {
     React.useCallback(() => {
       fetchProfile();
       processDailyLogin();
-    }, [])
+    }, [router])
   );
 
   const handleNav = (route: string) => {
@@ -200,7 +251,6 @@ export default function ProfilePage() {
         {/* Profile Information */}
         <View style={styles.profileContainer}>
           <Image source={require("../../assets/images/Dashboard Icons/Profile_Highlight.png")} style={styles.profileImage} />
-          
           {loading ? (
             <Text style={styles.loadingText}>Loading...</Text>
           ) : error ? (
@@ -208,28 +258,34 @@ export default function ProfilePage() {
           ) : (
             <View style={styles.profileInfo}>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>First Name:</Text>
-                <Text style={styles.infoValue}>{profile?.firstName || "Not set"}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Last Name:</Text>
-                <Text style={styles.infoValue}>{profile?.lastName || "Not set"}</Text>
+                <Text style={styles.infoLabel}>Name:</Text>
+                <Text style={styles.infoValue}>
+                  {getFullName(profile?.firstName, profile?.lastName)}
+                </Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Age:</Text>
-                <Text style={styles.infoValue}>{profile?.age || "Not set"}</Text>
+                <Text style={styles.infoValue}>
+                  {profile?.age ? `${profile.age} years` : "Not set"}
+                </Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Weight:</Text>
-                <Text style={styles.infoValue}>{profile?.weight || "Not set"}</Text>
+                <Text style={styles.infoValue}>
+                  {profile?.weight ? `${profile.weight} kg` : "Not set"}
+                </Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Height:</Text>
-                <Text style={styles.infoValue}>{profile?.height || "Not set"}</Text>
+                <Text style={styles.infoValue}>
+                  {profile?.height ? `${profile.height} cm` : "Not set"}
+                </Text>
               </View>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Body Goal:</Text>
-                <Text style={styles.infoValue}>{profile?.bodyGoalId || "Not set"}</Text>
+                <Text style={styles.infoLabel}>Goal:</Text>
+                <Text style={styles.infoValue}>
+                  {bodyGoalLabel(Number(profile?.bodyGoalId))}
+                </Text>
               </View>
             </View>
           )}

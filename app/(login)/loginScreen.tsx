@@ -60,7 +60,7 @@ export default function LoginScreen() {
     <SafeAreaView style={{ flex: 1, justifyContent: "flex-start", alignItems: "center", backgroundColor: "white" }}>
       <View>
         <Image
-          source={require("../../assets/images/foodGapp.png")}
+          source={require("../../assets/images/wellnu.png")}
           style={{ width: width * 0.81, height: width * 0.81, resizeMode: "contain" }}
         />
       </View>
