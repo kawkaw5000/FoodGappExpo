@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ChatbotScreen from "@/components/ChatbotScreen";
 import ShareModal from "@/components/ShareModal";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import UserExperienceService, { UserExperience } from "@/services/UserExperienceService";
+import UserExperienceService, { UserLevel } from "@/services/UserExperienceService";
 import { LevelBadge } from "@/components/LevelBadge";
 import { ShareData } from "@/services/SocialSharingService";
 import Config from "@/constants/Config";
@@ -83,7 +83,7 @@ export default function HomeScreen() {
   const [showGetStarted, setShowGetStarted] = useState(false);
   const [chatbotVisible, setChatbotVisible] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
-  const [userExperience, setUserExperience] = useState<UserExperience | null>(null);
+  const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
   const [userName, setUserName] = useState<string>('');
   
   // WellNū Study: Nutrition insights state
@@ -106,18 +106,39 @@ export default function HomeScreen() {
   // Load user data when screen focuses
   useFocusEffect(
     useCallback(() => {
+      loadUserLevel();
       loadUserData();
     }, [])
   );
 
+  const loadUserLevel = async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        const userLevel = await UserExperienceService.getUserLevel(userId);
+        setUserLevel(userLevel);
+      }
+    } catch (error) {
+      console.error('Error loading user level:', error);
+    }
+  };
+  // ...existing code...
   const loadUserData = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (userId) {
-        const userExp = await UserExperienceService.getUserExperience(userId);
-        setUserExperience(userExp);
-        setUserName('Food Enthusiast');
-        
+        // Fetch real user profile for name
+        const response = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(userId)}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const userInfo = data.userInfo || data;
+          setUserName(`${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim());
+        } else {
+          setUserName('');
+        }
         // WellNū Study: Load core features
         loadNutritionInsights(userId);
         loadUserProfile(userId);
@@ -125,6 +146,7 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error('Error loading user data:', error);
+      setUserName('');
     }
   };
 
@@ -445,7 +467,7 @@ export default function HomeScreen() {
     return contentMap[topic] || contentMap['protein'];
   };
 
-  const userLevel = userExperience ? UserExperienceService.getLevelInfo(userExperience.level) : null;
+  // Removed duplicate and invalid userLevel assignment. Use only the userLevel state from backend.
   
   const getShareData = (): ShareData => ({
     calories: realCalorieData.consumed,
@@ -455,7 +477,7 @@ export default function HomeScreen() {
     fats: dailyNutrition?.fats || 27,
     carbs: dailyNutrition?.carbs || 2,
     date: new Date().toLocaleDateString(),
-    userName,
+    userName: userName,
     level: userLevel?.level,
     badge: userLevel?.badge,
   });
@@ -497,6 +519,7 @@ export default function HomeScreen() {
                 size="small"
               />
               <Text style={styles.userLevelText}>{userLevel.title}</Text>
+              <Text style={styles.userLevelText}>{userName}</Text>
               {userProfile?.bmi && (
                 <Text style={styles.bmiText}>BMI: {userProfile.bmi}</Text>
               )}

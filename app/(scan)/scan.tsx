@@ -46,16 +46,14 @@ export default function ScanPage() {
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (userId) {
-        const result = await UserExperienceService.addXP(userId, amount, reason);
-        
-        // Show XP notification
+        const userLevel = await UserExperienceService.addXP(userId, amount, reason);
         setXPNotificationData({
-          xpGained: result.xpGained,
+          xpGained: amount,
           reason,
-          isLevelUp: result.leveledUp,
-          newLevel: result.newLevel || 0,
-          isConsecutiveBonus: false,
-          consecutiveDays: 0,
+          isLevelUp: false, // or true if backend returns
+          newLevel: userLevel.level,
+          isConsecutiveBonus: false, // Set appropriately if backend returns this
+          consecutiveDays: 0, // Set appropriately if backend returns this
         });
         setShowXPNotification(true);
       }
@@ -91,7 +89,7 @@ export default function ScanPage() {
         setFoodName(name);
         
         // Award XP for scanning
-        await awardXP(UserExperienceService.XP_REWARDS.SCAN_FOOD, 'Food Scanned');
+        await awardXP(25, 'Food Scanned');
       } else {
         Alert.alert("Detection Failed", "Could not detect food. Please enter manually.");
       }
@@ -236,7 +234,7 @@ export default function ScanPage() {
         setNutritionData(null);
         
         // Award XP for food logging
-        await awardXP(UserExperienceService.XP_REWARDS.FOOD_LOG, 'Food Logged');
+        await awardXP(50, 'Food Logged');
         
         // Navigate back to log page after 2 seconds to show the updated logs
         setTimeout(() => {

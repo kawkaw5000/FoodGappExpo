@@ -14,15 +14,83 @@ interface FoodRecommendation {
   description: string;
 }
 
-export default function TrackPage() {
-  // TODO: Replace with real user profile from context or storage
-  const mockUserProfile = {
+
+
+// Example placeholder for user profile hook/context
+// Replace this with your actual user context or async storage logic
+function useUserProfile() {
+  // TODO: Connect to your real user context or async storage
+  // Example: return useContext(UserContext)
+  // Example return value:
+  // return { id: 1, name: "Jane Doe", age: 25, gender: "female", height: 160, weight: 60, body_goal: "maintain weight" };
+  return {
+    id: 1,
+    name: "Jane Doe",
     age: 25,
     gender: "female",
     height: 160,
     weight: 60,
     body_goal: "maintain weight"
   };
+}
+
+// Leveling system: fetch user level/exp from backend
+function useUserLevel(userId: number) {
+  const [levelData, setLevelData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!userId) return;
+    setLoading(true);
+    setError(null);
+    fetch(require('../../constants/Config').default.API_BASE + `/account/user-level/${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        setLevelData(data);
+        setLoading(false);
+      })
+      .catch(e => {
+        setError('Failed to fetch user level');
+        setLoading(false);
+      });
+  }, [userId]);
+
+  return { levelData, loading, error, setLevelData };
+}
+
+// Example placeholder for food logs hook
+// Replace with your backend or async storage logic
+function useFoodLogs(userId: number) {
+  // TODO: Connect to your backend or async storage for food logs
+  // Example return value:
+  // return [{ id: 1, name: "Adobong Manok", calories: 285, date: "2025-07-30" }];
+  return [
+    { id: 1, name: "Adobong Manok", calories: 285, date: "2025-07-30" },
+    { id: 2, name: "Pancit Canton", calories: 340, date: "2025-07-30" }
+  ];
+}
+
+export default function TrackPage() {
+  const userProfile = useUserProfile();
+  // Fallback: show loading or error if user profile is not loaded
+  if (!userProfile) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <Text style={{ fontSize: 16, color: '#333' }}>Loading user profile...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Leveling system: fetch user level/exp
+  const { levelData, loading: levelLoading, error: levelError, setLevelData } = useUserLevel(userProfile.id);
+
+  // Fetch food logs for the current user
+  const foodLogs = useFoodLogs(userProfile.id);
+
+  // Filter food logs for today (from backend/storage)
+  const todayString = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+  const todayLogs = foodLogs.filter(log => log.date && log.date.startsWith(todayString));
 
   // State for personalized recommendations
   const [recommendations, setRecommendations] = useState<string | string[]>("");
@@ -256,6 +324,18 @@ export default function TrackPage() {
           fats: parsedNutrition.fats,
         }
       ]);
+
+      // Add experience points for logging food (e.g., 10 exp per food)
+      const expRes = await fetch(require('../../constants/Config').default.API_BASE + '/account/add-experience', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userProfile.id, experience: 10 })
+      });
+      if (expRes.ok) {
+        const expData = await expRes.json();
+        setLevelData(expData); // update level UI immediately
+      }
+
       Alert.alert("Added to Tracker", `${food.name} has been added to your daily tracker!`);
     } catch (e) {
       Alert.alert("Error", "Failed to fetch nutrition info for this food.");
@@ -286,8 +366,9 @@ export default function TrackPage() {
   const totalMacros = getTotalMacros();
 
 
-  // Fetch all dashboard data when trackedFoods change
+  // Fetch all dashboard data when trackedFoods or userProfile change
   useEffect(() => {
+    if (!userProfile) return;
     // 1. Personalized Recommendations
     const fetchRecommendations = async () => {
       setRecommendationsLoading(true);
@@ -297,7 +378,7 @@ export default function TrackPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            user_profile: mockUserProfile,
+            user_profile: userProfile,
             current_nutrition: trackedFoods
           })
         });
@@ -333,7 +414,7 @@ export default function TrackPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...mockUserProfile,
+            ...userProfile,
             daily_nutrition: trackedFoods
           })
         });
@@ -355,7 +436,7 @@ export default function TrackPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            user_profile: mockUserProfile,
+            user_profile: userProfile,
             duration_days: 7
           })
         });
@@ -417,12 +498,34 @@ export default function TrackPage() {
     fetchMealPlan();
     fetchEducation();
     fetchAlternatives();
-  }, [trackedFoods]);
+  }, [trackedFoods, userProfile]);
 
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
+        {/* Leveling System UI */}
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#4CAF50', marginBottom: 4 }}>Leveling System</Text>
+          {levelLoading ? (
+            <Text style={{ color: '#888' }}>Loading level...</Text>
+          ) : levelError ? (
+            <Text style={{ color: '#D32F2F' }}>{levelError}</Text>
+          ) : levelData ? (
+            <View style={{ alignItems: 'center', width: '100%' }}>
+              <Text style={{ fontSize: 16, color: '#333' }}>Level {levelData.userLevel}</Text>
+              <View style={{ width: '80%', height: 16, backgroundColor: '#E0E0E0', borderRadius: 8, marginVertical: 8 }}>
+                <View style={{
+                  width: `${Math.min(100, 100 * (levelData.userCurrentExperience / levelData.experienceToNextLevel))}%`,
+                  height: '100%',
+                  backgroundColor: '#4CAF50',
+                  borderRadius: 8
+                }} />
+              </View>
+              <Text style={{ fontSize: 14, color: '#333' }}>{levelData.userCurrentExperience} / {levelData.experienceToNextLevel} XP to next level</Text>
+            </View>
+          ) : null}
+        </View>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
@@ -612,14 +715,29 @@ export default function TrackPage() {
           ))}
         </View>
 
-        {/* Tracked Foods Today */}
-        {trackedFoods.length > 0 && (
+
+        {/* Tracked Foods Today (from backend/storage) */}
+        {todayLogs.length > 0 && (
           <View style={styles.trackedSection}>
-            <Text style={styles.sectionTitle}>Tracked Today ({trackedFoods.length} items)</Text>
-            {trackedFoods.map((food, index) => (
-              <View key={`${food.id}-${index}`} style={styles.trackedItem}>
-                <Text style={styles.trackedName}>{food.name}</Text>
-                <Text style={styles.trackedCalories}>{Number(food.calories).toFixed(1)} kcal</Text>
+            <Text style={styles.sectionTitle}>Tracked Today ({todayLogs.length} items)</Text>
+            {todayLogs.map((log) => (
+              <View key={log.id} style={styles.trackedItem}>
+                <Text style={styles.trackedName}>{log.name}</Text>
+                <Text style={styles.trackedCalories}>{Number(log.calories).toFixed(1)} kcal</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Food Logs from backend/storage */}
+        {foodLogs.length > 0 && (
+          <View style={styles.trackedSection}>
+            <Text style={styles.sectionTitle}>Food Logs (All Time)</Text>
+            {foodLogs.map((log) => (
+              <View key={log.id} style={styles.trackedItem}>
+                <Text style={styles.trackedName}>{log.name}</Text>
+                <Text style={styles.trackedCalories}>{Number(log.calories).toFixed(1)} kcal</Text>
+                <Text style={{ fontSize: 12, color: '#888' }}>{log.date}</Text>
               </View>
             ))}
           </View>

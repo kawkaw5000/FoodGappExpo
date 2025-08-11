@@ -1,25 +1,32 @@
-import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity, Alert, ScrollView, Modal } from "react-native";
+
+
+import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity, ScrollView, Modal } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter } from "expo-router";
 import { useCallback, useState, useEffect } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import LocalStorageService, { UserProfile, BodyGoal } from '@/services/LocalStorageService';
+import { LevelBadge } from '@/components/LevelBadge';
+import Config from '@/constants/Config';
 
-interface UserStats {
-  totalFoodsLogged: number;
-  currentStreak: number;
-  totalXP: number;
-  level: number;
-  achievementsUnlocked: number;
-  weeklyGoalProgress: number;
+interface UserProfile {
+  userId: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  weight?: number;
+  height?: number;
+  age?: number;
+  bodyGoalId?: number;
+  isActive?: boolean;
 }
 
-interface NutritionGoals {
-  dailyCalories: number;
-  dailyProtein: number;
-  dailyFats: number;
-  dailyCarbs: number;
-  waterGoal: number;
+// Use the backend-driven UserLevel interface
+interface UserLevel {
+  level: number;
+  badge: string;
+  title: string;
+  currentXP: number;
+  requiredXP: number;
 }
 
 interface Achievement {
@@ -33,186 +40,109 @@ interface Achievement {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const storageService = LocalStorageService.getInstance();
-  
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [showAchievementsModal, setShowAchievementsModal] = useState(false);
+
   const handleLogout = useCallback(() => {
     router.replace("/(login)/loginScreen");
   }, [router]);
 
-  // Profile state based on User table schema
-  const [profile, setProfile] = useState<UserProfile>({
-    UserId: 1,
-    Email: "",
-    FirstName: "",
-    LastName: "",
-    Weight: 0,
-    Height: 0,
-    Age: 0,
-    BodyGoalId: 1,
-    IsActive: true
-  });
-
-  // Body goals from BodyGoal table
-  const [bodyGoals] = useState<BodyGoal[]>(storageService.getBodyGoals());
-
-  // Enhanced states
-  const [userStats, setUserStats] = useState<UserStats>({
-    totalFoodsLogged: 47,
-    currentStreak: 5,
-    totalXP: 2350,
-    level: 8,
-    achievementsUnlocked: 12,
-    weeklyGoalProgress: 78
-  });
-
-  const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals>({
-    dailyCalories: 2000,
-    dailyProtein: 150,
-    dailyFats: 65,
-    dailyCarbs: 250,
-    waterGoal: 2000
-  });
-
-  const [achievements, setAchievements] = useState<Achievement[]>([
-    {
-      id: '1',
-      title: 'First Steps',
-      description: 'Log your first meal',
-      icon: '🥗',
-      unlocked: true,
-      unlockedDate: '2024-01-15'
-    },
-    {
-      id: '2',
-      title: 'Streak Master',
-      description: 'Maintain a 7-day logging streak',
-      icon: '🔥',
-      unlocked: true,
-      unlockedDate: '2024-01-22'
-    },
-    {
-      id: '3',
-      title: 'Filipino Food Explorer',
-      description: 'Try 10 different Filipino dishes',
-      icon: '🇵🇭',
-      unlocked: true,
-      unlockedDate: '2024-01-28'
-    },
-    {
-      id: '4',
-      title: 'Nutrition Champion',
-      description: 'Meet all macro goals for 5 days',
-      icon: '💪',
-      unlocked: false
-    },
-    {
-      id: '5',
-      title: 'Social Sharer',
-      description: 'Share 5 achievements on social media',
-      icon: '📱',
-      unlocked: true,
-      unlockedDate: '2024-02-01'
-    }
-  ]);
-
-  const [showStatsModal, setShowStatsModal] = useState(false);
-  const [showAchievementsModal, setShowAchievementsModal] = useState(false);
-  const [showGoalsModal, setShowGoalsModal] = useState(false);
-
   useEffect(() => {
-    const loadProfile = async () => {
+    const fetchProfileAndLevel = async () => {
       try {
-        // Load from local storage using service
-        let userProfile = await storageService.getUserProfile();
-        
-        if (!userProfile) {
-          // Initialize default profile if none exists
-          userProfile = await storageService.initializeDefaultProfile();
-        }
-        
-        setProfile(userProfile);
+        const userId = await AsyncStorage.getItem('userId');
+        if (!userId) return;
 
-        // Load user stats
-        const statsData = await AsyncStorage.getItem('userStats');
-        if (statsData) {
-          setUserStats(JSON.parse(statsData));
+        // Fetch profile
+        const profileRes = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(userId)}`);
+        if (profileRes.ok) {
+          const data = await profileRes.json();
+          const userInfo = data.userInfo || data;
+          setProfile({
+            userId: userInfo.userId,
+            email: userInfo.email,
+            firstName: userInfo.firstName,
+            lastName: userInfo.lastName,
+            weight: userInfo.weight,
+            height: userInfo.height,
+            age: userInfo.age,
+            bodyGoalId: userInfo.bodyGoalId,
+            isActive: userInfo.isActive
+          });
         }
 
-        // Load achievements
-        const achievementsData = await AsyncStorage.getItem('userAchievements');
-        if (achievementsData) {
-          setAchievements(JSON.parse(achievementsData));
+        // Fetch level
+        const levelRes = await fetch(`${Config.Account_API}/user-level/${encodeURIComponent(userId)}`);
+        if (levelRes.ok) {
+          const levelData = await levelRes.json();
+          setUserLevel(levelData);
         }
-      } catch (error) {
-        console.log('Error loading profile:', error);
+
+        // Fetch achievements (optional, if backend supports)
+        const achRes = await fetch(`${Config.Account_API}/user-achievements/${encodeURIComponent(userId)}`);
+        if (achRes.ok) {
+          const achData = await achRes.json();
+          setAchievements(Array.isArray(achData) ? achData : []);
+        }
+      } catch (err) {
+        // Handle error
       }
     };
-    loadProfile();
+    fetchProfileAndLevel();
   }, []);
 
-  const handleDeleteProfile = async () => {
-    Alert.alert(
-      "Delete Profile",
-      "Are you sure you want to delete your profile? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete", style: "destructive", onPress: async () => {
-            try {
-              // Clear all user data using the service
-              await storageService.clearUserData(profile.UserId);
-              Alert.alert("Deleted", "Your profile has been deleted.");
-              router.replace("/(login)/loginScreen");
-            } catch (error) {
-              console.log('Delete profile error:', error);
-              Alert.alert("Error", "Failed to delete profile.");
-            }
-          }
-        }
-      ]
-    );
+
+  // Helper to map bodyGoalId to label
+  const getBodyGoalLabel = (id?: number) => {
+    if (id === 1) return 'Lose Weight';
+    if (id === 2) return 'Maintain Weight';
+    if (id === 3) return 'Gain Weight';
+    return 'Not set';
   };
 
-  const getCurrentBodyGoal = () => {
-    const goal = storageService.getBodyGoalById(profile.BodyGoalId);
-    return goal?.BodyGoalName || 'Not set';
-  };
+  // Calculate requiredXP if not provided by backend
+  const computedRequiredXP = userLevel ? (typeof userLevel.requiredXP === 'number' ? userLevel.requiredXP : userLevel.level * 100) : 100;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Enhanced Header Section */}
         <View style={styles.headerSection}>
           <View style={styles.profileCard}>
             <View style={styles.avatarContainer}>
-              <Image 
-                source={require("../../assets/images/Dashboard Icons/Profile_Highlight.png")} 
-                style={styles.profileAvatar} 
-              />
-              <View style={styles.levelBadgeContainer}>
-                <Text style={styles.levelBadgeText}>Lv.{userStats.level}</Text>
+              <View style={styles.bigLevelNumberContainer}>
+                <Text style={styles.bigLevelNumber}>
+                  {userLevel && typeof userLevel.level === 'number' ? userLevel.level : 0}
+                </Text>
               </View>
             </View>
-            
+
             <View style={styles.userInfo}>
               <Text style={styles.userName}>
-                {profile.FirstName && profile.LastName 
-                  ? `${profile.FirstName} ${profile.LastName}` 
-                  : 'WellNū User'}
+                {profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : 'WellNū User'}
               </Text>
-              <Text style={styles.userLevel}>Level {userStats.level} Nutrition Tracker</Text>
-              <Text style={styles.xpText}>{userStats.totalXP.toLocaleString()} XP</Text>
+              <Text style={styles.userLevel}>
+                {userLevel && userLevel.title ? userLevel.title : 'No Title'}
+              </Text>
+              <Text style={styles.xpText}>
+                {userLevel && typeof userLevel.currentXP === 'number' ? userLevel.currentXP.toLocaleString() : '0'} XP
+              </Text>
+              {/* XP Progress Bar and Level Info */}
+              <View style={styles.levelProgressContainer}>
+                <View style={styles.levelProgressBar}>
+                  <View
+                    style={[ 
+                      styles.levelProgressFill,
+                      { width: `${Math.min(100, (userLevel && typeof userLevel.currentXP === 'number' ? userLevel.currentXP : 0) / computedRequiredXP * 100)}%` }
+                    ]}
+                  />
+                </View>
+                <Text style={styles.levelProgressText}>
+                  {(userLevel && typeof userLevel.currentXP === 'number' ? userLevel.currentXP : 0)}/{computedRequiredXP} XP to Level {(userLevel && typeof userLevel.level === 'number' ? userLevel.level + 1 : 1)}
+                </Text>
+              </View>
             </View>
-          </View>
-          
-          {/* Level Progress Bar */}
-          <View style={styles.levelProgressContainer}>
-            <View style={styles.levelProgressBar}>
-              <View style={[styles.levelProgressFill, { width: `${(userStats.totalXP % 500) / 5}%` }]} />
-            </View>
-            <Text style={styles.levelProgressText}>
-              {userStats.totalXP % 500}/500 XP to Level {userStats.level + 1}
-            </Text>
           </View>
         </View>
 
@@ -226,129 +156,49 @@ export default function ProfileScreen() {
                 <Text style={styles.infoLabel}>Name</Text>
               </View>
               <Text style={styles.infoValue}>
-                {profile.FirstName && profile.LastName 
-                  ? `${profile.FirstName} ${profile.LastName}` 
-                  : 'Not set'}
+                {profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : 'Not set'}
               </Text>
             </View>
-            
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>
                 <Text style={styles.infoIcon}>📧</Text>
                 <Text style={styles.infoLabel}>Email</Text>
               </View>
-              <Text style={styles.infoValue}>
-                {profile.Email || 'Not set'}
-              </Text>
+              <Text style={styles.infoValue}>{profile?.email || 'Not set'}</Text>
             </View>
-            
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>
                 <Text style={styles.infoIcon}>🎂</Text>
                 <Text style={styles.infoLabel}>Age</Text>
               </View>
-              <Text style={styles.infoValue}>
-                {profile.Age ? `${profile.Age} years` : 'Not set'}
-              </Text>
+              <Text style={styles.infoValue}>{profile?.age ? `${profile.age} years` : 'Not set'}</Text>
             </View>
-            
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>
                 <Text style={styles.infoIcon}>⚖️</Text>
                 <Text style={styles.infoLabel}>Weight</Text>
               </View>
-              <Text style={styles.infoValue}>
-                {profile.Weight ? `${profile.Weight} kg` : 'Not set'}
-              </Text>
+              <Text style={styles.infoValue}>{profile?.weight ? `${profile.weight} kg` : 'Not set'}</Text>
             </View>
-            
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>
                 <Text style={styles.infoIcon}>📏</Text>
                 <Text style={styles.infoLabel}>Height</Text>
               </View>
-              <Text style={styles.infoValue}>
-                {profile.Height ? `${profile.Height} cm` : 'Not set'}
-              </Text>
+              <Text style={styles.infoValue}>{profile?.height ? `${profile.height} cm` : 'Not set'}</Text>
             </View>
-            
-            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}> 
               <View style={styles.infoLabelContainer}>
                 <Text style={styles.infoIcon}>🎯</Text>
                 <Text style={styles.infoLabel}>Goal</Text>
               </View>
-              <Text style={styles.infoValue}>
-                {getCurrentBodyGoal()}
-              </Text>
+              <Text style={styles.infoValue}>{getBodyGoalLabel(profile?.bodyGoalId)}</Text>
             </View>
           </View>
         </View>
 
-        {/* Enhanced Stats Dashboard */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Your Progress Dashboard</Text>
-          
-          <View style={styles.statsGrid}>
-            <TouchableOpacity style={styles.modernStatCard} onPress={() => setShowStatsModal(true)}>
-              <Text style={styles.statIcon}>🍽️</Text>
-              <Text style={styles.statNumber}>{userStats.totalFoodsLogged}</Text>
-              <Text style={styles.statLabel}>Foods Logged</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.modernStatCard} onPress={() => setShowStatsModal(true)}>
-              <Text style={styles.statIcon}>🔥</Text>
-              <Text style={styles.statNumber}>{userStats.currentStreak}</Text>
-              <Text style={styles.statLabel}>Day Streak</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.modernStatCard} onPress={() => setShowStatsModal(true)}>
-              <Text style={styles.statIcon}>⭐</Text>
-              <Text style={styles.statNumber}>{userStats.level}</Text>
-              <Text style={styles.statLabel}>Current Level</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.modernStatCard} onPress={() => setShowAchievementsModal(true)}>
-              <Text style={styles.statIcon}>🏆</Text>
-              <Text style={styles.statNumber}>{achievements.filter(a => a.unlocked).length}</Text>
-              <Text style={styles.statLabel}>Achievements</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.weeklyProgressSection}>
-            <Text style={styles.progressTitle}>Weekly Goal Progress</Text>
-            <View style={styles.weeklyProgressBar}>
-              <View style={[styles.weeklyProgressFill, { width: `${userStats.weeklyGoalProgress}%` }]} />
-            </View>
-            <Text style={styles.progressText}>{userStats.weeklyGoalProgress}% Complete</Text>
-          </View>
-        </View>
-
-        {/* Enhanced Quick Actions */}
+        {/* Edit Profile Button */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          
-          <TouchableOpacity style={styles.modernActionButton} onPress={() => setShowGoalsModal(true)}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.modernActionIcon}>🎯</Text>
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Nutrition Goals</Text>
-              <Text style={styles.actionSubtitle}>Set and track daily macro targets</Text>
-            </View>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.modernActionButton} onPress={() => setShowAchievementsModal(true)}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.modernActionIcon}>🏆</Text>
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Achievements</Text>
-              <Text style={styles.actionSubtitle}>View your nutrition milestones</Text>
-            </View>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.modernActionButton} onPress={() => router.push('/(profile)/editProfile')}>
             <View style={styles.actionIconContainer}>
               <Text style={styles.modernActionIcon}>✏️</Text>
@@ -359,18 +209,19 @@ export default function ProfileScreen() {
             </View>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.modernActionButton} onPress={() => setShowStatsModal(true)}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.modernActionIcon}>📊</Text>
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Detailed Statistics</Text>
-              <Text style={styles.actionSubtitle}>View comprehensive progress data</Text>
-            </View>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
         </View>
+
+        {/* Achievements Section (if available) */}
+        {achievements.length > 0 && (
+          <View style={styles.statsSection}>
+            <Text style={styles.sectionTitle}>Achievements</Text>
+            <TouchableOpacity style={styles.modernStatCard} onPress={() => setShowAchievementsModal(true)}>
+              <Text style={styles.statIcon}>🏆</Text>
+              <Text style={styles.statNumber}>{achievements.filter(a => a.unlocked).length}</Text>
+              <Text style={styles.statLabel}>Unlocked</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Logout Section */}
         <View style={styles.logoutSection}>
@@ -380,75 +231,11 @@ export default function ProfileScreen() {
             backgroundColor="#FCB647"
             textColor="white"
           />
-          
-          <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteProfile}>
-            <Text style={styles.deleteButtonText}>Delete Account</Text>
-          </TouchableOpacity>
         </View>
-
         <View style={{ height: 20 }} />
       </ScrollView>
-      
-      {/* Enhanced Stats Modal */}
-      <Modal visible={showStatsModal} animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Detailed Statistics</Text>
-            <TouchableOpacity onPress={() => setShowStatsModal(false)}>
-              <Text style={styles.closeButton}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.statDetailCard}>
-              <Text style={styles.statDetailTitle}>🍽️ Nutrition Progress</Text>
-              <View style={styles.statDetailRow}>
-                <Text style={styles.statDetailLabel}>Total Foods Logged</Text>
-                <Text style={styles.statDetailValue}>{userStats.totalFoodsLogged}</Text>
-              </View>
-              <View style={styles.statDetailRow}>
-                <Text style={styles.statDetailLabel}>Current Streak</Text>
-                <Text style={styles.statDetailValue}>{userStats.currentStreak} days</Text>
-              </View>
-              <View style={styles.statDetailRow}>
-                <Text style={styles.statDetailLabel}>Weekly Goal Progress</Text>
-                <Text style={styles.statDetailValue}>{userStats.weeklyGoalProgress}%</Text>
-              </View>
-            </View>
 
-            <View style={styles.statDetailCard}>
-              <Text style={styles.statDetailTitle}>⭐ Experience & Level</Text>
-              <View style={styles.statDetailRow}>
-                <Text style={styles.statDetailLabel}>Current Level</Text>
-                <Text style={styles.statDetailValue}>Level {userStats.level}</Text>
-              </View>
-              <View style={styles.statDetailRow}>
-                <Text style={styles.statDetailLabel}>Total XP</Text>
-                <Text style={styles.statDetailValue}>{userStats.totalXP.toLocaleString()}</Text>
-              </View>
-              <View style={styles.statDetailRow}>
-                <Text style={styles.statDetailLabel}>XP to Next Level</Text>
-                <Text style={styles.statDetailValue}>{500 - (userStats.totalXP % 500)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.statDetailCard}>
-              <Text style={styles.statDetailTitle}>🏆 Achievements</Text>
-              <View style={styles.statDetailRow}>
-                <Text style={styles.statDetailLabel}>Achievements Unlocked</Text>
-                <Text style={styles.statDetailValue}>{achievements.filter(a => a.unlocked).length}/{achievements.length}</Text>
-              </View>
-              <View style={styles.statDetailRow}>
-                <Text style={styles.statDetailLabel}>Completion Rate</Text>
-                <Text style={styles.statDetailValue}>
-                  {Math.round((achievements.filter(a => a.unlocked).length / achievements.length) * 100)}%
-                </Text>
-              </View>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Enhanced Achievements Modal */}
+      {/* Achievements Modal */}
       <Modal visible={showAchievementsModal} animationType="slide">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -459,8 +246,8 @@ export default function ProfileScreen() {
           </View>
           <ScrollView style={styles.modalContent}>
             {achievements.map((achievement, index) => (
-              <View 
-                key={achievement.id} 
+              <View
+                key={achievement.id}
                 style={[
                   styles.achievementDetailCard,
                   !achievement.unlocked && styles.lockedAchievement
@@ -494,52 +281,25 @@ export default function ProfileScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-
-      {/* Enhanced Goals Modal */}
-      <Modal visible={showGoalsModal} animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Nutrition Goals</Text>
-            <TouchableOpacity onPress={() => setShowGoalsModal(false)}>
-              <Text style={styles.closeButton}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.goalCard}>
-              <Text style={styles.goalCardTitle}>🎯 Daily Targets</Text>
-              <View style={styles.goalRow}>
-                <Text style={styles.goalLabel}>Daily Calories</Text>
-                <Text style={styles.goalValue}>{nutritionGoals.dailyCalories} kcal</Text>
-              </View>
-              <View style={styles.goalRow}>
-                <Text style={styles.goalLabel}>Daily Protein</Text>
-                <Text style={styles.goalValue}>{nutritionGoals.dailyProtein}g</Text>
-              </View>
-              <View style={styles.goalRow}>
-                <Text style={styles.goalLabel}>Daily Fats</Text>
-                <Text style={styles.goalValue}>{nutritionGoals.dailyFats}g</Text>
-              </View>
-              <View style={styles.goalRow}>
-                <Text style={styles.goalLabel}>Daily Carbs</Text>
-                <Text style={styles.goalValue}>{nutritionGoals.dailyCarbs}g</Text>
-              </View>
-              <View style={styles.goalRow}>
-                <Text style={styles.goalLabel}>Water Goal</Text>
-                <Text style={styles.goalValue}>{nutritionGoals.waterGoal}ml</Text>
-              </View>
-              
-              <TouchableOpacity style={styles.editGoalsButton}>
-                <Text style={styles.editGoalsText}>Edit Goals</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  bigLevelNumberContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FCB647',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  bigLevelNumber: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
   container: {
     flex: 1,
     backgroundColor: "#F8F9FA",
