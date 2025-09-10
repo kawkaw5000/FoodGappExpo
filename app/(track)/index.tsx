@@ -1,29 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Alert } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Config from '../../constants/Config';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Alert, Platform } from "react-native";
 import { useRouter } from "expo-router";
 
+// Backend food item shape (capitalized keys from Python service)
 interface FoodRecommendation {
-  id: string;
-  name: string;
-  calories: number;
-  protein: number;
-  fats: number;
-  carbs: number;
-  type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-  cuisine: 'filipino' | 'international';
-  healthScore: number;
-  nutritionFacts: {
-    cholesterol: string;
-    sodium: string;
-    dietaryFiber: string;
-    sugar: string;
-    vitaminD: string;
-    calcium: string;
-    iron: string;
-    potassium: string;
-    vitaminA: string;
-    vitaminC: string;
-  };
+  NutrientLogId?: string;
+  FoodId?: string;
+  Calories: number;
+  Protein: number;
+  Fat: number;
+  Carbs: number;
+  // Allow any extra fields without breaking
+  [key: string]: any;
 }
 
 interface MealPlan {
@@ -42,245 +32,142 @@ interface MealPlan {
 }
 
 export default function TrackPage() {
+  // Daily log state
+  // Daily log (currently unused since we rely on generated meal plan per day)
+  const [dailyLogs, setDailyLogs] = useState<{ [day: string]: FoodRecommendation[] }>({});
   const router = useRouter();
-  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   const [isLoadingMealPlan, setIsLoadingMealPlan] = useState(false);
-  const [showRecommendations, setShowRecommendations] = useState(false);
   const [showMealPlan, setShowMealPlan] = useState(false);
-  const [selectedFood, setSelectedFood] = useState<FoodRecommendation | null>(null);
-  const [showNutritionDetails, setShowNutritionDetails] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [selectedMealType, setSelectedMealType] = useState<'all' | 'breakfast' | 'lunch' | 'dinner' | 'snack'>('all');
-  const [selectedCuisine, setSelectedCuisine] = useState<'all' | 'filipino' | 'international'>('all');
   const [weeklyMealPlan, setWeeklyMealPlan] = useState<MealPlan[]>([]);
-  const [currentDay, setCurrentDay] = useState('monday');
-  const [showWeeklyView, setShowWeeklyView] = useState(false);
+  const [mealPlanError, setMealPlanError] = useState<string | null>(null);
+  // Removed food recommendations, nutrition details, and confirmation state
+  // Get today's day name in lowercase
+  function getTodayName() {
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    return days[new Date().getDay()];
+  }
+  const [currentDay, setCurrentDay] = useState(getTodayName());
+  // Removed Weekly View state
   const [showGroceryList, setShowGroceryList] = useState(false);
   const [groceryItems, setGroceryItems] = useState<string[]>([]);
   const [showMealPrepTips, setShowMealPrepTips] = useState(false);
 
-  const foodRecommendations: FoodRecommendation[] = [
-    // Filipino Breakfast
-    {
-      id: "1",
-      name: "Tapsilog (Beef Tapa, Garlic Rice, Fried Egg)",
-      calories: 520,
-      protein: 35,
-      fats: 28,
-      carbs: 35,
-      type: 'breakfast',
-      cuisine: 'filipino',
-      healthScore: 75,
-      nutritionFacts: {
-        cholesterol: "280mg",
-        sodium: "450mg",
-        dietaryFiber: "2g",
-        sugar: "3g",
-        vitaminD: "8IU",
-        calcium: "80mg",
-        iron: "12mg",
-        potassium: "420mg",
-        vitaminA: "8%",
-        vitaminC: "2%"
-      }
-    },
-    {
-      id: "2",
-      name: "Adobong Manok (Chicken Adobo)",
-      calories: 340,
-      protein: 28,
-      fats: 18,
-      carbs: 12,
-      type: 'lunch',
-      cuisine: 'filipino',
-      healthScore: 85,
-      nutritionFacts: {
-        cholesterol: "220mg",
-        sodium: "380mg",
-        dietaryFiber: "1g",
-        sugar: "8g",
-        vitaminD: "2IU",
-        calcium: "45mg",
-        iron: "8mg",
-        potassium: "580mg",
-        vitaminA: "3%",
-        vitaminC: "5%"
-      }
-    },
-    {
-      id: "3",
-      name: "Sinigang na Baboy (Pork in Tamarind Soup)",
-      calories: 280,
-      protein: 22,
-      fats: 15,
-      carbs: 18,
-      type: 'dinner',
-      cuisine: 'filipino',
-      healthScore: 90,
-      nutritionFacts: {
-        cholesterol: "180mg",
-        sodium: "420mg",
-        dietaryFiber: "4g",
-        sugar: "6g",
-        vitaminD: "1IU",
-        calcium: "65mg",
-        iron: "10mg",
-        potassium: "720mg",
-        vitaminA: "12%",
-        vitaminC: "25%"
-      }
-    },
-    {
-      id: "4",
-      name: "Halo-Halo",
-      calories: 220,
-      protein: 8,
-      fats: 6,
-      carbs: 35,
-      type: 'snack',
-      cuisine: 'filipino',
-      healthScore: 70,
-      nutritionFacts: {
-        cholesterol: "25mg",
-        sodium: "80mg",
-        dietaryFiber: "3g",
-        sugar: "28g",
-        vitaminD: "15IU",
-        calcium: "120mg",
-        iron: "2mg",
-        potassium: "280mg",
-        vitaminA: "15%",
-        vitaminC: "20%"
-      }
-    },
-    // International Options
-    {
-      id: "5",
-      name: "Greek Yogurt with Berries",
-      calories: 180,
-      protein: 15,
-      fats: 8,
-      carbs: 18,
-      type: 'breakfast',
-      cuisine: 'international',
-      healthScore: 95,
-      nutritionFacts: {
-        cholesterol: "20mg",
-        sodium: "60mg",
-        dietaryFiber: "5g",
-        sugar: "15g",
-        vitaminD: "25IU",
-        calcium: "200mg",
-        iron: "1mg",
-        potassium: "320mg",
-        vitaminA: "8%",
-        vitaminC: "30%"
-      }
-    },
-    {
-      id: "6",
-      name: "Grilled Salmon with Quinoa",
-      calories: 420,
-      protein: 32,
-      fats: 18,
-      carbs: 28,
-      type: 'lunch',
-      cuisine: 'international',
-      healthScore: 98,
-      nutritionFacts: {
-        cholesterol: "80mg",
-        sodium: "220mg",
-        dietaryFiber: "4g",
-        sugar: "2g",
-        vitaminD: "45IU",
-        calcium: "60mg",
-        iron: "6mg",
-        potassium: "680mg",
-        vitaminA: "5%",
-        vitaminC: "8%"
-      }
-    }
-  ];
+  // (Removed standalone food recommendations state)
+  const [profile, setProfile] = useState<{ userId: number; weight?: number; height?: number } | null>(null);
 
-  // Generate weekly meal plan
-  const generateWeeklyMealPlan = (): MealPlan[] => {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const mealPlan: MealPlan[] = [];
-
-    days.forEach((day, index) => {
-      const breakfast = foodRecommendations.filter(f => f.type === 'breakfast')[index % 2];
-      const lunch = foodRecommendations.filter(f => f.type === 'lunch')[index % 2];
-      const dinner = foodRecommendations.filter(f => f.type === 'dinner')[0];
-      const snack = foodRecommendations.filter(f => f.type === 'snack')[0];
-
-      if (breakfast && lunch && dinner && snack) {
-        mealPlan.push({
-          id: `day-${index}`,
-          day,
-          meals: { breakfast, lunch, dinner, snack },
-          totalCalories: breakfast.calories + lunch.calories + dinner.calories + snack.calories,
-          totalProtein: breakfast.protein + lunch.protein + dinner.protein + snack.protein,
-          totalFats: breakfast.fats + lunch.fats + dinner.fats + snack.fats,
-          totalCarbs: breakfast.carbs + lunch.carbs + dinner.carbs + snack.carbs,
-        });
-      }
-    });
-
-    return mealPlan;
-  };
-
+  // Fetch user profile from backend
   useEffect(() => {
-    setWeeklyMealPlan(generateWeeklyMealPlan());
+    const fetchProfile = async () => {
+      try {
+        const userId = await AsyncStorage.getItem('userId');
+        if (!userId) return;
+        const profileRes = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(userId)}`);
+        if (profileRes.ok) {
+          const data = await profileRes.json();
+          const userInfo = data.userInfo || data;
+          setProfile({
+            userId: userInfo.userId,
+            weight: userInfo.weight,
+            height: userInfo.height
+          });
+        }
+      } catch (err) {
+        // Handle error silently
+      }
+    };
+    fetchProfile();
   }, []);
 
-  const handleRecommendFood = async () => {
-    setIsLoadingRecommendations(true);
-    setTimeout(() => {
-      setIsLoadingRecommendations(false);
-      setShowRecommendations(true);
-    }, 2000);
-  };
+  // Fetch recommendations and weekly meal plan
 
-  const handleGenerateMealPlan = async () => {
+  const resolvePythonBase = () => Config.PYTHON_BASE || Config.BASE_URL;
+
+  const fetchWeeklyMealPlan = async () => {
+    setMealPlanError(null);
     setIsLoadingMealPlan(true);
-    setTimeout(() => {
-      setIsLoadingMealPlan(false);
+    try {
+      if (!profile || profile.weight == null || profile.height == null) {
+        throw new Error('Profile incomplete: set height & weight in profile screen.');
+      }
+      const payload = { weight: profile.weight, height_cm: profile.height, max_results: 28 };
+      const base = resolvePythonBase();
+  const url = `${base}${Config.MEALPLAN_ENDPOINT || '/get_food_recommendations'}`;
+      console.log('[MealPlan] POST', url, payload);
+
+      // Quick preflight health check (3s timeout) to fail fast on network issues
+      try {
+        const healthController = new AbortController();
+        const healthTimeout = setTimeout(() => healthController.abort(), 3000);
+  const healthRes = await fetch(`${base}${Config.HEALTH_ENDPOINT || '/health'}`, { signal: healthController.signal });
+        clearTimeout(healthTimeout);
+        if (!healthRes.ok) console.warn('[MealPlan] Health check HTTP', healthRes.status);
+      } catch (preErr) {
+        console.warn('[MealPlan] Health check failed (likely network / IP / server down):', preErr);
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+        });
+      } catch (e: any) {
+        if (e.name === 'AbortError') throw new Error('Request timed out (10s). Is the Python server running?');
+        throw e;
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (!response.ok) {
+        const txt = await response.text();
+        throw new Error(`HTTP ${response.status} ${response.statusText}: ${txt.slice(0,140)}`);
+      }
+      let data: any;
+      try { data = await response.json(); } catch { throw new Error('Response is not valid JSON.'); }
+  if (!data || !Array.isArray(data.foods)) throw new Error('Response missing foods array.');
+      const foods: FoodRecommendation[] = data.foods;
+      if (foods.length < 4) throw new Error('Not enough food items returned (need at least 4).');
+
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const mealPlan: MealPlan[] = [];
+      for (let i = 0; i < 7; i++) {
+        const dayMeals = foods.slice(i * 4, (i + 1) * 4);
+        if (dayMeals.length < 4) break; // stop if incomplete day
+        const [breakfast, lunch, dinner, snack] = dayMeals;
+        mealPlan.push({
+          id: `day-${i}`,
+          day: days[i],
+          meals: { breakfast, lunch, dinner, snack },
+          totalCalories: (breakfast.Calories||0)+(lunch.Calories||0)+(dinner.Calories||0)+(snack.Calories||0),
+          totalProtein: (breakfast.Protein||0)+(lunch.Protein||0)+(dinner.Protein||0)+(snack.Protein||0),
+          totalFats: (breakfast.Fat||0)+(lunch.Fat||0)+(dinner.Fat||0)+(snack.Fat||0),
+          totalCarbs: (breakfast.Carbs||0)+(lunch.Carbs||0)+(dinner.Carbs||0)+(snack.Carbs||0),
+        });
+      }
+      if (mealPlan.length === 0) throw new Error('Could not build a single full day (need 4 items per day).');
+      setWeeklyMealPlan(mealPlan);
       setShowMealPlan(true);
-    }, 2500);
+    } catch (e: any) {
+      console.error('[MealPlan] ERROR', e);
+      setMealPlanError(e.message || 'Unknown error');
+      Alert.alert('Meal Plan Error', e.message || 'Failed to fetch meal plan');
+    } finally {
+      setIsLoadingMealPlan(false);
+    }
   };
 
-  const getFilteredRecommendations = () => {
-    return foodRecommendations.filter(food => {
-      const mealTypeMatch = selectedMealType === 'all' || food.type === selectedMealType;
-      const cuisineMatch = selectedCuisine === 'all' || food.cuisine === selectedCuisine;
-      return mealTypeMatch && cuisineMatch;
-    });
-  };
+  // ...existing code...
+  const handleGenerateMealPlan = fetchWeeklyMealPlan;
 
-  const filteredRecommendations = getFilteredRecommendations();
+  // Fetch meal plan only on button click
 
-  const handleSelectFood = (food: FoodRecommendation) => {
-    setSelectedFood(food);
-    setShowNutritionDetails(true);
-  };
+  // ...existing code...
 
-  const handleAddSelectedFood = () => {
-    setShowNutritionDetails(false);
-    setShowRecommendations(false);
-    setShowConfirmation(true);
-    
-    // Hide confirmation after 2 seconds
-    setTimeout(() => {
-      setShowConfirmation(false);
-      setSelectedFood(null);
-    }, 2000);
-  };
-
-  const handleCancelRecommendations = () => {
-    setShowRecommendations(false);
-    setShowNutritionDetails(false);
-    setSelectedFood(null);
-  };
+  // ...existing code...
 
   const handleDayChange = (direction: 'prev' | 'next') => {
     setCurrentDay(prevDay => {
@@ -292,27 +179,27 @@ export default function TrackPage() {
     });
   };
 
-  // Generate grocery list from weekly meal plan
+  // Generate grocery list from meal plan
   const generateGroceryList = () => {
     const ingredients: string[] = [];
     weeklyMealPlan.forEach(plan => {
-      // Extract ingredients from meal names (simplified)
       const meals = [plan.meals.breakfast, plan.meals.lunch, plan.meals.dinner, plan.meals.snack];
       meals.forEach(meal => {
-        // Simple ingredient extraction based on common Filipino foods
-        if (meal.name.includes('Rice')) ingredients.push('Rice');
-        if (meal.name.includes('Chicken') || meal.name.includes('Manok')) ingredients.push('Chicken');
-        if (meal.name.includes('Beef') || meal.name.includes('Tapa')) ingredients.push('Beef');
-        if (meal.name.includes('Fish') || meal.name.includes('Bangus')) ingredients.push('Fresh Fish');
-        if (meal.name.includes('Egg')) ingredients.push('Eggs');
-        if (meal.name.includes('Vegetable') || meal.name.includes('Pinakbet')) ingredients.push('Mixed Vegetables');
-        if (meal.name.includes('Tomato')) ingredients.push('Tomatoes');
-        if (meal.name.includes('Onion')) ingredients.push('Onions');
-        if (meal.name.includes('Garlic')) ingredients.push('Garlic');
-        if (meal.name.includes('Ginger')) ingredients.push('Ginger');
-        if (meal.name.includes('Soy')) ingredients.push('Soy Sauce');
-        if (meal.name.includes('Vinegar')) ingredients.push('Vinegar');
-        if (meal.name.includes('Oil')) ingredients.push('Cooking Oil');
+        const name = (meal.FoodId || meal.NutrientLogId || '').toString().toLowerCase();
+        if (!name) return;
+        if (name.includes('rice')) ingredients.push('Rice');
+        if (name.includes('chicken') || name.includes('manok')) ingredients.push('Chicken');
+        if (name.includes('beef') || name.includes('tapa')) ingredients.push('Beef');
+        if (name.includes('fish') || name.includes('bangus')) ingredients.push('Fresh Fish');
+        if (name.includes('egg')) ingredients.push('Eggs');
+        if (name.includes('vegetable') || name.includes('pinakbet')) ingredients.push('Mixed Vegetables');
+        if (name.includes('tomato')) ingredients.push('Tomatoes');
+        if (name.includes('onion')) ingredients.push('Onions');
+        if (name.includes('garlic')) ingredients.push('Garlic');
+        if (name.includes('ginger')) ingredients.push('Ginger');
+        if (name.includes('soy')) ingredients.push('Soy Sauce');
+        if (name.includes('vinegar')) ingredients.push('Vinegar');
+        if (name.includes('oil')) ingredients.push('Cooking Oil');
       });
     });
     
@@ -324,12 +211,9 @@ export default function TrackPage() {
     setShowGroceryList(true);
   };
 
-  // Handle weekly view toggle
-  const handleWeeklyView = () => {
-    setShowWeeklyView(true);
-  };
+  // Removed Weekly View handler
 
-  // Handle meal prep tips
+  // Meal prep tips toggle
   const handleMealPrepTips = () => {
     setShowMealPrepTips(true);
   };
@@ -343,9 +227,6 @@ export default function TrackPage() {
         </View>
 
         <View style={styles.actionSection}>
-          <TouchableOpacity style={styles.recommendButton} onPress={handleRecommendFood}>
-            <Text style={styles.recommendButtonText}>Get Food Recommendations</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.mealPlanButton} onPress={handleGenerateMealPlan}>
             <Text style={styles.mealPlanButtonText}>Generate Meal Plan</Text>
           </TouchableOpacity>
@@ -353,9 +234,6 @@ export default function TrackPage() {
 
         {/* Enhanced Planning Tools */}
         <View style={styles.enhancedTools}>
-          <TouchableOpacity style={styles.toolButton} onPress={handleWeeklyView}>
-            <Text style={styles.toolButtonText}>📅 Weekly View</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.toolButton} onPress={generateGroceryList}>
             <Text style={styles.toolButtonText}>🛒 Grocery List</Text>
           </TouchableOpacity>
@@ -364,9 +242,9 @@ export default function TrackPage() {
           </TouchableOpacity>
         </View>
 
-        {/* Meal Plan Section */}
+        {/* Current Day Meal Plan (derived from weeklyMealPlan) */}
         <View style={styles.mealPlanSection}>
-          <Text style={styles.sectionTitle}>Weekly Meal Plan</Text>
+          <Text style={styles.sectionTitle}>Today's Meal Plan</Text>
           <View style={styles.daySelector}>
             <TouchableOpacity onPress={() => handleDayChange('prev')}>
               <Text style={styles.dayChangeText}>←</Text>
@@ -376,50 +254,29 @@ export default function TrackPage() {
               <Text style={styles.dayChangeText}>→</Text>
             </TouchableOpacity>
           </View>
-
-          {isLoadingMealPlan ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4CAF50" />
-              <Text style={styles.loadingText}>Generating meal plan...</Text>
-            </View>
-          ) : (
-            <View style={styles.mealPlanDetails}>
-              {weeklyMealPlan.filter(plan => plan.day.toLowerCase() === currentDay).map(plan => (
-                <View key={plan.id} style={styles.dailyPlan}>
-                  <Text style={styles.mealTime}>Breakfast</Text>
-                  <View style={styles.mealItem}>
-                    <Text style={styles.foodName}>{plan.meals.breakfast.name}</Text>
-                    <Text style={styles.foodCalories}>{plan.meals.breakfast.calories} kcal</Text>
-                  </View>
-
-                  <Text style={styles.mealTime}>Lunch</Text>
-                  <View style={styles.mealItem}>
-                    <Text style={styles.foodName}>{plan.meals.lunch.name}</Text>
-                    <Text style={styles.foodCalories}>{plan.meals.lunch.calories} kcal</Text>
-                  </View>
-
-                  <Text style={styles.mealTime}>Dinner</Text>
-                  <View style={styles.mealItem}>
-                    <Text style={styles.foodName}>{plan.meals.dinner.name}</Text>
-                    <Text style={styles.foodCalories}>{plan.meals.dinner.calories} kcal</Text>
-                  </View>
-
-                  <Text style={styles.mealTime}>Snack</Text>
-                  <View style={styles.mealItem}>
-                    <Text style={styles.foodName}>{plan.meals.snack.name}</Text>
-                    <Text style={styles.foodCalories}>{plan.meals.snack.calories} kcal</Text>
-                  </View>
-
+          <View style={styles.mealPlanDetails}>
+            {(() => {
+              const plan = weeklyMealPlan.find(p => p.day.toLowerCase() === currentDay);
+              if (!plan) return <Text style={styles.noMealText}>{weeklyMealPlan.length? 'No plan for this day.' : 'Generate a meal plan to see meals.'}</Text>;
+              const entries = [
+                { label: 'Breakfast', item: plan.meals.breakfast },
+                { label: 'Lunch', item: plan.meals.lunch },
+                { label: 'Dinner', item: plan.meals.dinner },
+                { label: 'Snack', item: plan.meals.snack },
+              ];
+              return entries.map((e, idx) => (
+                <View key={e.label+idx} style={styles.dailyPlan}>
+                  <Text style={styles.foodName}>{e.label}: {e.item.FoodId || e.item.NutrientLogId || 'Food'}</Text>
+                  <Text style={styles.foodCalories}>{e.item.Calories} kcal</Text>
                   <View style={styles.nutritionSummary}>
-                    <Text style={styles.summaryText}>Total Calories: {plan.totalCalories} kcal</Text>
-                    <Text style={styles.summaryText}>Protein: {plan.totalProtein}g</Text>
-                    <Text style={styles.summaryText}>Fats: {plan.totalFats}g</Text>
-                    <Text style={styles.summaryText}>Carbs: {plan.totalCarbs}g</Text>
+                    <Text style={styles.summaryText}>Protein: {e.item.Protein}g</Text>
+                    <Text style={styles.summaryText}>Fat: {e.item.Fat}g</Text>
+                    <Text style={styles.summaryText}>Carbs: {e.item.Carbs}g</Text>
                   </View>
                 </View>
-              ))}
-            </View>
-          )}
+              ));
+            })()}
+          </View>
         </View>
 
         {/* Disclaimer at the bottom */}
@@ -430,169 +287,25 @@ export default function TrackPage() {
         </View>
       </ScrollView>
 
-      {/* Loading Modal */}
-      <Modal visible={isLoadingRecommendations} transparent animationType="fade">
+      {/* Loading modal for meal plan generation */}
+      <Modal visible={isLoadingMealPlan} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={styles.loadingText}>Finding food recommendations...</Text>
+            <ActivityIndicator size="large" color="#2196F3" />
+            <Text style={styles.loadingText}>Generating meal plan...</Text>
           </View>
         </View>
       </Modal>
 
-      {/* Food Recommendations Modal */}
-      <Modal visible={showRecommendations} animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Recommended Foods</Text>
-            <TouchableOpacity onPress={handleCancelRecommendations}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.recommendationsList}>
-            {filteredRecommendations.map((food) => (
-              <TouchableOpacity 
-                key={food.id} 
-                style={styles.foodItem} 
-                onPress={() => handleSelectFood(food)}
-              >
-                <Text style={styles.foodName}>{food.name}</Text>
-                <Text style={styles.foodCalories}>{food.calories} kcal</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Nutrition Details Modal */}
-      <Modal visible={showNutritionDetails} animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowNutritionDetails(false)}>
-              <Text style={styles.backText}>← Back</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Nutrition Details</Text>
-            <View style={{ width: 50 }} />
-          </View>
-          
-          {selectedFood && (
-            <ScrollView style={styles.nutritionContainer}>
-              <Text style={styles.nutritionTitle}>{selectedFood.name}</Text>
-              <Text style={styles.servingSize}>Serving size: {selectedFood.calories}g</Text>
-              
-              <View style={styles.caloriesSection}>
-                <Text style={styles.caloriesText}>{selectedFood.calories} calories</Text>
-              </View>
-
-              <View style={styles.macrosSection}>
-                <Text style={styles.macrosTitle}>Macronutrients</Text>
-                <View style={styles.macroRow}>
-                  <Text style={styles.macroLabel}>Protein</Text>
-                  <Text style={styles.macroValue}>{selectedFood.protein}g</Text>
-                </View>
-                <View style={styles.macroRow}>
-                  <Text style={styles.macroLabel}>Fats</Text>
-                  <Text style={styles.macroValue}>{selectedFood.fats}g</Text>
-                </View>
-                <View style={styles.macroRow}>
-                  <Text style={styles.macroLabel}>Carbs</Text>
-                  <Text style={styles.macroValue}>{selectedFood.carbs}g</Text>
-                </View>
-              </View>
-
-              <View style={styles.nutrientsSection}>
-                <Text style={styles.nutrientsTitle}>Other Nutrients</Text>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Cholesterol</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.cholesterol}</Text>
-                </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Sodium</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.sodium}</Text>
-                </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Dietary Fiber</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.dietaryFiber}</Text>
-                </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Sugar</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.sugar}</Text>
-                </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Vitamin D</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.vitaminD}</Text>
-                </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Calcium</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.calcium}</Text>
-                </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Iron</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.iron}</Text>
-                </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Potassium</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.potassium}</Text>
-                </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Vitamin A</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.vitaminA}</Text>
-                </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientLabel}>Vitamin C</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood.nutritionFacts.vitaminC}</Text>
-                </View>
-              </View>
-
-              <TouchableOpacity style={styles.logFoodButton} onPress={handleAddSelectedFood}>
-                <Text style={styles.logFoodButtonText}>Add to Log</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          )}
-        </SafeAreaView>
-      </Modal>
-
-      {/* Confirmation Modal */}
-      <Modal visible={showConfirmation} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.confirmationContainer}>
-            <Text style={styles.confirmationText}>✓ Food added to log successfully!</Text>
-          </View>
+      {mealPlanError && (
+        <View style={styles.debugBanner}>
+          <Text style={styles.debugText} numberOfLines={3}>Debug: {mealPlanError}</Text>
         </View>
-      </Modal>
+      )}
 
-      {/* Weekly View Modal */}
-      <Modal visible={showWeeklyView} animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Weekly Meal Plan Overview</Text>
-            <TouchableOpacity onPress={() => setShowWeeklyView(false)}>
-              <Text style={styles.cancelText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.weeklyContent}>
-            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-              const dayPlan = weeklyMealPlan.find(plan => plan.day.toLowerCase() === day.toLowerCase());
-              return (
-                <View key={day} style={styles.weeklyDayCard}>
-                  <Text style={styles.weeklyDayTitle}>{day}</Text>
-                  {dayPlan ? (
-                    <View style={styles.weeklyMeals}>
-                      <Text style={styles.weeklyMealText}>🌅 {dayPlan.meals.breakfast.name}</Text>
-                      <Text style={styles.weeklyMealText}>☀️ {dayPlan.meals.lunch.name}</Text>
-                      <Text style={styles.weeklyMealText}>🌙 {dayPlan.meals.dinner.name}</Text>
-                      <Text style={styles.weeklyMealText}>🍿 {dayPlan.meals.snack.name}</Text>
-                      <Text style={styles.weeklyTotalText}>Total: {dayPlan.totalCalories} kcal</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.noMealText}>No meal plan for this day</Text>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+  {/* Removed food recommendations, nutrition details, and confirmation modals */}
+
+  {/* Removed Weekly View Modal */}
 
       {/* Grocery List Modal */}
       <Modal visible={showGroceryList} animationType="slide">
@@ -806,6 +519,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
+  debugBanner: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
+    backgroundColor: '#fee',
+    borderWidth: 1,
+    borderColor: '#f99',
+    borderRadius: 8,
+    padding: 8,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#900'
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: "#fff",
@@ -998,15 +726,9 @@ const styles = StyleSheet.create({
   },
   weeklyMeals: {
     paddingLeft: 8,
-  },
-  weeklyMealText: {
-    fontSize: 14,
-    color: '#666',
+    // Removed Weekly View button and handler
     marginBottom: 4,
     lineHeight: 20,
-  },
-  weeklyTotalText: {
-    fontSize: 14,
     fontWeight: 'bold',
     color: '#4CAF50',
     marginTop: 8,

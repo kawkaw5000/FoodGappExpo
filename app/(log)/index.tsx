@@ -325,11 +325,14 @@ export default function LogPage() {
           <Text style={styles.mealTitle}>{mealName}</Text>
           <Text style={styles.mealCalories}>{mealCalories} kcal</Text>
         </View>
-        
+
         {mealFoods.map((food) => (
           <TouchableOpacity key={food.id} style={styles.foodItem} onPress={() => handleFoodPress(food)}>
             <View style={styles.foodInfo}>
-              <Text style={styles.foodName}>{food.name}</Text>
+              <Text style={[styles.foodName, !food.name || food.name.startsWith('Food Entry') ? { color: 'red', fontWeight: 'bold' } : null]}>
+                {food.name}
+                {!food.name || food.name.startsWith('Food Entry') ? ' (Name missing from backend)' : ''}
+              </Text>
               <Text style={styles.foodCalories}>{food.calories} kcal</Text>
             </View>
             <View style={styles.macros}>
@@ -339,7 +342,7 @@ export default function LogPage() {
             </View>
           </TouchableOpacity>
         ))}
-        
+
         <TouchableOpacity style={styles.addFoodButton} onPress={() => handleAddFood(mealName)}>
           <Text style={styles.addFoodButtonText}>+ Add Food</Text>
         </TouchableOpacity>
