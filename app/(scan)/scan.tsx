@@ -108,18 +108,18 @@ export default function ScanPage() {
     }
     setLoadingNutrition(true);
     try {
-      // Get nutritional information first - format for your Python API
+      // Get nutritional information using the input food name only (no Gemini FEL lookup)
       const nutritionPayload = {
         items: [
           {
-            foodName: foodName,
+            foodName: foodName, // Use the input value directly
             grams: parseFloat(grams)
           }
         ],
-        body_goal: "maintain weight", // You can get this from user profile later
+        body_goal: "maintain weight",
         date: new Date().toISOString()
       };
-      console.log("[Nutrition] Outgoing payload:", nutritionPayload);
+  // ...existing code...
 
       const nutritionRes = await fetch(Config.NUTRITION_API, {
         method: "POST",
@@ -128,11 +128,8 @@ export default function ScanPage() {
       });
 
       const nutritionRawText = await nutritionRes.text();
-      console.log("[Nutrition] Raw response text:", nutritionRawText);
       if (nutritionRes.ok) {
         const nutritionResponse = JSON.parse(nutritionRawText);
-        console.log("[Nutrition] Parsed response:", nutritionResponse);
-        // Use new backend: always expect foods array
         let foodObj = null;
         if (nutritionResponse.foods && Array.isArray(nutritionResponse.foods) && nutritionResponse.foods.length > 0) {
           foodObj = nutritionResponse.foods[0];
@@ -143,6 +140,8 @@ export default function ScanPage() {
           Number(foodObj.Fat ?? 0) > 0 ||
           Number(foodObj.Carbs ?? 0) > 0
         )) {
+          // Simplified nutrition log
+          console.log(`[Nutrition] ${foodName} (${foodObj.FoodGramAmount}g): ${foodObj.Calories} kcal, ${foodObj.Protein}g P, ${foodObj.Fat}g F, ${foodObj.Carbs}g C`);
           setNutritionData({
             calories: Number(foodObj.Calories ?? 0),
             protein: Number(foodObj.Protein ?? 0),
@@ -151,7 +150,6 @@ export default function ScanPage() {
           });
           setShowNutritionModal(true);
         } else {
-          // Show a temporary alert and do not show modal
           Alert.alert("No nutrition data found for this food.");
           setTimeout(() => setLoadingNutrition(false), 1200);
         }
