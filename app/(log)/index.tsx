@@ -6,6 +6,8 @@ import Config from "../../constants/Config";
 
 interface LoggedFood {
   id: string;
+  foodId?: number;
+  foodLogId?: number;
   name: string;
   calories: number;
   protein: number;
@@ -108,11 +110,19 @@ export default function LogPage() {
             console.log("Processing log:", log);
             console.log("Nutrient data:", log.nutrientData);
             
-            // Get food name from the Food table data, fallback to generic name
-            const foodName = log.foodData?.FoodName || `Food Entry ${log.foodLogId}`;
+            // Determine food name with multiple fallbacks:
+            // 1) foodData from joined Food table: log.foodData?.FoodName
+            // 2) top-level foodName provided by backend: log.foodName
+            // 3) nested nutrientData.food?.FoodName (some serializers include nested food)
+            // 4) fallback to generic "Food Entry {foodId}"
+            const foodName = log.foodData?.FoodName
+              || log.foodName
+              || log.nutrientData?.food?.FoodName
+              || `Food Entry ${log.foodId}`;
             
             return {
               id: log.foodLogId.toString(),
+              foodId: log.foodId, // include FoodId for modal and debugging
               name: foodName,
               // Use the exact field names from your NutrientLog table
               calories: parseInt(log.nutrientData.calories) || 0, // lowercase 'c'
@@ -469,7 +479,8 @@ export default function LogPage() {
               <View style={styles.nutritionFacts}>
                 <View style={styles.nutrientRow}>
                   <Text style={styles.nutrientName}>Food Log ID</Text>
-                  <Text style={styles.nutrientValue}>{selectedFood?.id}</Text>
+                  <Text style={styles.nutrientValue}>FoodLogId: {selectedFood?.id}</Text>
+                  <Text style={styles.nutrientValue}>FoodId: {selectedFood?.foodId ?? 'N/A'}</Text>
                 </View>
                 {selectedFood?.nutrientLogId && (
                   <View style={styles.nutrientRow}>
