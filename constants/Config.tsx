@@ -1,4 +1,4 @@
-const BASE_IP = "192.168.254.148"; // <-- ensure this matches your PC's LAN IPv4
+const BASE_IP = "192.168.0.115"; // <-- ensure this matches your PC's LAN IPv4
 const EXPRESS_PORT = "5000";        // Python/Flask service port
 const ASPNET_PORT = "5129";         // .NET API port
 

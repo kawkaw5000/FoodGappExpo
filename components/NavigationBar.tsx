@@ -31,11 +31,12 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handl
 
   // Helper function to check if current route matches the nav item
   const isRouteActive = (navRoute: string, currentPath: string) => {
-    const normalizedNavRoute = navRoute.replace(/\/$/, '');
-    const normalizedCurrentPath = currentPath.replace(/\/$/, '');
-    
-    return normalizedCurrentPath === normalizedNavRoute || 
-           normalizedCurrentPath.startsWith(normalizedNavRoute + '/');
+    // Normalize both routes: remove parentheses, leading/trailing slashes
+    const normalize = (str: string) => str.replace(/[()]/g, '').replace(/\/$/, '').replace(/^\//, '');
+    const nav = normalize(navRoute);
+    const curr = normalize(currentPath);
+    // Match if equal or if current path starts with nav route (for nested)
+    return curr === nav || curr.startsWith(nav + '/');
   };
 
   // Get active index for indicator position
@@ -106,16 +107,19 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handl
         {navItems.map((item, index) => {
           const isActive = isRouteActive(item.route, currentRoute);
           const animatedValue = animationValues.current[item.name] || new Animated.Value(0);
-          
+          // Add testID for automation and accessibility
           return (
             <TouchableOpacity
               key={item.name}
+              testID={`nav-tab-${item.name.toLowerCase()}`}
+              accessibilityLabel={`nav-tab-${item.name.toLowerCase()}`}
               style={styles.iconButton}
               onPress={() => handleNavPress(item.route, item.name)}
               onPressIn={() => handlePressIn(item.name)}
               onPressOut={() => handlePressOut(item.name)}
               activeOpacity={0.8}
             >
+              {/* ...no highlight bar... */}
               <Animated.View 
                 style={[
                   styles.iconContainer,
@@ -129,15 +133,13 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handl
                       },
                     ],
                   },
-                  isActive && styles.activeIconContainer,
                 ]}
               >
                 <Image
                   source={isActive ? item.highlight : item.icon}
-                  style={[styles.icon, isActive && styles.activeIcon]}
+                  style={[styles.icon, isActive && styles.activeIcon, isActive && { tintColor: '#FCB647' }]}
                 />
               </Animated.View>
-              
               <Animated.Text
                 style={[
                   styles.iconLabel,
@@ -152,8 +154,6 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handl
               >
                 {item.name}
               </Animated.Text>
-              
-              {/* Active dot indicator */}
               {isActive && (
                 <Animated.View 
                   style={[
@@ -224,11 +224,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   
-  activeIconContainer: {
-    backgroundColor: "rgba(252, 182, 71, 0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(252, 182, 71, 0.3)",
-  },
+
+  // ...existing code...
   
   icon: {
     width: 28,
@@ -249,7 +246,7 @@ const styles = StyleSheet.create({
   },
   
   iconLabelActive: {
-    color: "#FCB647",
+    color: "#fff",
     fontWeight: "bold",
     fontSize: 12,
   },

@@ -167,38 +167,63 @@ export default function ScanPage() {
   const handleConfirmLog = async () => {
     setLoading(true);
     try {
-      // Map meal type to category ID for backend
-      const foodCategoryId = mealType === "Breakfast" ? 1 : 
-                           mealType === "Lunch" ? 2 : 
-                           mealType === "Dinner" ? 3 : 1;
+      // Retrieve userId for the new /log endpoint
+      const storedUserId = await AsyncStorage.getItem('userId');
+      const userId = storedUserId ? parseInt(storedUserId) : null;
+      if (!userId) {
+        Alert.alert("Error", "Missing user ID. Please sign in again.");
+        setLoading(false);
+        return;
+      }
 
-      // Use the logScannedFood endpoint which accepts nutrition data directly
-      const payload = {
-        foodName,
-        grams: parseFloat(grams),
-        calories: nutritionData?.calories?.toString() || "0",
-        protein: nutritionData?.protein?.toString() || "0", 
-        fat: nutritionData?.total_fat?.toString() || "0",
-        mealType: mealType // Added mealType to match backend
+      // Primary: use the /api/foodlogging/log endpoint (new controller)
+
+      const logPayload = {
+        UserId: userId,
+        FoodName: foodName,
+        Grams: parseFloat(grams),
+        MealType: mealType,
+        Calories: nutritionData?.calories?.toString() || "0",
+        Protein: nutritionData?.protein?.toString() || "0",
+        Fat: nutritionData?.fats?.toString() || "0",
+        Carbs: nutritionData?.carbs?.toString() || "0",
       };
-      
-      console.log("Scanned Food Payload:", payload);
-      
-      const res = await fetch(`${Config.API_BASE}/api/foodlogging/logScannedFood`, {
+
+      console.log("Logging payload (/log):", logPayload);
+
+      let res = await fetch(`${Config.API_BASE}/api/foodlogging/log`, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json"
-        },
-        credentials: 'include', // Important for authentication
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(logPayload),
       });
-      
+
+      // Optional fallback: if /logScannedFood exists and /log fails with 404, try it to pass macros
+      let rawResponseText = await res.text();
+      if (!res.ok && res.status === 404) {
+        const scannedPayload = {
+          foodName,
+          grams: parseFloat(grams),
+          calories: nutritionData?.calories?.toString() || "0",
+          protein: nutritionData?.protein?.toString() || "0",
+          fat: nutritionData?.fats?.toString() || "0",
+          mealType: mealType,
+        };
+        console.log("/log 404; trying /logScannedFood with payload:", scannedPayload);
+        res = await fetch(`${Config.API_BASE}/api/foodlogging/logScannedFood`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: 'include',
+          body: JSON.stringify(scannedPayload),
+        });
+        rawResponseText = await res.text();
+      }
+
       console.log("Response status:", res.status);
-      const rawResponseText = await res.text();
       console.log("Raw response text:", rawResponseText);
-      
+
       if (res.ok) {
-        const responseData = JSON.parse(rawResponseText);
+        const responseData = JSON.parse(rawResponseText || '{}');
         console.log("Response data:", responseData);
         
         // Add to local recentScans in AsyncStorage
@@ -231,8 +256,8 @@ export default function ScanPage() {
         setMealType("Breakfast");
         setNutritionData(null);
         
-        // Award XP for food logging
-        await awardXP(50, 'Food Logged');
+  // Award XP for food logging (frontend UI). Backend may also award XP.
+  await awardXP(50, 'Food Logged');
         
         // Navigate back to log page after 2 seconds to show the updated logs
         setTimeout(() => {
@@ -240,7 +265,7 @@ export default function ScanPage() {
           router.back();
         }, 2000);
       } else {
-        const errorData = JSON.parse(rawResponseText);
+        const errorData = rawResponseText ? JSON.parse(rawResponseText) : { error: 'Unknown error' };
         Alert.alert("Error", errorData.error || "Failed to log food.");
       }
     } catch (e) {

@@ -128,7 +128,7 @@ export default function LogPage() {
               calories: parseInt(log.nutrientData.calories) || 0, // lowercase 'c'
               protein: parseFloat(log.nutrientData.protein) || 0, // lowercase 'p'
               fats: parseFloat(log.nutrientData.fat) || 0, // 'fat' not 'fats'
-              carbs: 0, // Not in your NutrientLog table yet
+              carbs: parseFloat(log.nutrientData.carbs) || 0,
               meal: log.mealType || 'Breakfast', // Use mealType from backend response
               grams: parseFloat(log.nutrientData.foodGramAmount) || 100, // camelCase
               // Additional nutrition data for the modal - using exact database field names
@@ -379,7 +379,7 @@ export default function LogPage() {
           {/* Enhanced Nutrition Summary */}
           {dailySummary && (
             <View style={styles.nutritionSummary}>
-              <Text style={styles.summaryTitle}>📊 Daily Nutrition Summary</Text>
+              <Text style={styles.summaryTitle}>📊 Logged Nutrition Summary</Text>
               
               <View style={styles.macroGrid}>
                 <View style={styles.macroCard}>

@@ -55,6 +55,11 @@ export default function TrackPage() {
   // (Removed standalone food recommendations state)
   const [profile, setProfile] = useState<{ userId: number; weight?: number; height?: number } | null>(null);
 
+  // Daily Calorie Intake state
+  const [dailyCalorieIntake, setDailyCalorieIntake] = useState<number | null>(null);
+  const [calorieGoal, setCalorieGoal] = useState<number>(2000); // You can make this dynamic if needed
+  const [loadingCalorieIntake, setLoadingCalorieIntake] = useState<boolean>(false);
+
   // Fetch user profile from backend
   useEffect(() => {
     const fetchProfile = async () => {
@@ -76,6 +81,29 @@ export default function TrackPage() {
       }
     };
     fetchProfile();
+  }, []);
+
+  // Fetch daily calorie intake
+  useEffect(() => {
+    const fetchDailyIntake = async () => {
+      setLoadingCalorieIntake(true);
+      try {
+        const userId = await AsyncStorage.getItem('userId');
+        if (!userId) return;
+        const response = await fetch(`${Config.API_BASE}/api/foodlogging/getDailyIntake?userId=${encodeURIComponent(userId)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDailyCalorieIntake(data.calorieIntake ?? 0);
+        } else {
+          setDailyCalorieIntake(null);
+        }
+      } catch (err) {
+        setDailyCalorieIntake(null);
+      } finally {
+        setLoadingCalorieIntake(false);
+      }
+    };
+    fetchDailyIntake();
   }, []);
 
   // Fetch recommendations and weekly meal plan
@@ -160,7 +188,6 @@ export default function TrackPage() {
     }
   };
 
-  // ...existing code...
   const handleGenerateMealPlan = fetchWeeklyMealPlan;
 
   // Fetch meal plan only on button click
@@ -221,6 +248,28 @@ export default function TrackPage() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Daily Calorie Intake Summary */}
+        <View style={styles.calorieSummaryContainer}>
+          <Text style={styles.calorieSummaryTitle}>🔥 Daily Calorie Intake</Text>
+          {loadingCalorieIntake ? (
+            <ActivityIndicator size="small" color="#4CAF50" />
+          ) : (
+            <>
+              <Text style={styles.calorieSummaryValue}>
+                {dailyCalorieIntake ?? 0} / {calorieGoal} kcal
+              </Text>
+              <View style={styles.calorieProgressBarBg}>
+                <View
+                  style={[
+                    styles.calorieProgressBarFill,
+                    { width: `${Math.min(((dailyCalorieIntake ?? 0) / calorieGoal) * 100, 100)}%` }
+                  ]}
+                />
+              </View>
+            </>
+          )}
+        </View>
+
         <View style={styles.header}>
           <Text style={styles.title}>Food Recommendations & Nutrition</Text>
           <Text style={styles.subtitle}>Get personalized food recommendations and detailed nutrition information</Text>
@@ -796,5 +845,41 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 6,
     lineHeight: 20,
+  },
+  calorieSummaryContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  calorieSummaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  calorieSummaryValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 8,
+  },
+  calorieProgressBarBg: {
+    width: '100%',
+    height: 10,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  calorieProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 5,
   },
 });
