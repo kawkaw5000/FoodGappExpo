@@ -589,6 +589,21 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Get Started Section - Always visible for user onboarding */}
+        <View style={styles.getStartedSection}>
+          <Text style={styles.getStartedTitle}>Ready to get personalized recommendations?</Text>
+          <TouchableOpacity 
+            style={styles.getStartedButton}
+            onPress={() => {
+              console.log('Get Started button pressed - navigating to profile edit');
+              router.push('/(profile)/editProfile');
+            }}
+          >
+            <Text style={styles.getStartedButtonText}>Get Started</Text>
+            <Ionicons name="arrow-forward" size={20} color="#FCB647" style={styles.buttonIcon} />
+          </TouchableOpacity>
+        </View>
+
         {/* Exercise Section */}
         <View style={styles.exerciseSection}>
           <View style={styles.exerciseHeader}>
@@ -1159,5 +1174,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 4,
+  },
+  // Get Started Section Styles
+  getStartedSection: {
+    backgroundColor: '#FCB647',
+    padding: 20,
+    marginHorizontal: 20,
+    marginTop: 15,
+    marginBottom: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  getStartedTitle: {
+    fontSize: 18,
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 15,
+    fontWeight: '600',
+  },
+  getStartedButton: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  getStartedButtonText: {
+    color: '#FCB647',
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  buttonIcon: {
+    marginLeft: 4,
   },
 });
