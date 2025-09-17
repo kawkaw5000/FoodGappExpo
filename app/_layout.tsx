@@ -1,4 +1,4 @@
-import { Stack, useNavigationContainerRef, usePathname, useRouter } from "expo-router";
+import { Stack, useNavigationContainerRef, usePathname, useRouter, useSegments } from "expo-router";
 import { useCallback, useEffect } from "react";
 import { StatusBar, View, Image, TouchableOpacity, Dimensions, StyleSheet, Text } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -7,23 +7,52 @@ import BottomNavBar from "@/components/NavigationBar";
 
 export default function RootLayout() {
   const pathname = usePathname(); 
+  const segments = useSegments();
 
   const hideBottomNav = pathname === "/loginScreen" || 
                         pathname === "/registerScreen" || 
                         pathname === "/registerMainScreen" ||
+                        pathname === "/ForgotPasswordScreen" ||
                         pathname.includes('/manualEntry') ||
                         pathname.includes('/scan');
   useEffect(() => {
     console.log(hideBottomNav)
     console.log(pathname)
+    console.log('Segments:', segments)
   })
   const router = useRouter();
-  const currentRoute = pathname; // Use actual current pathname instead of hardcoded value
+  
+  // Use segments to determine current route more accurately
+  const getCurrentRoute = () => {
+    console.log('Raw segments:', segments, 'Segments length:', segments.length);
+    
+    if (!segments) return '/(home)';
+    
+    const segmentString = JSON.stringify(segments);
+    console.log('Segment string:', segmentString);
+    
+    // Check for group routes in segments
+    if (segmentString.includes('(log)')) return '/(log)';
+    if (segmentString.includes('(track)')) return '/(track)';
+    if (segmentString.includes('(scan)')) return '/(scan)';
+    if (segmentString.includes('(profile)')) return '/(profile)';
+    if (segmentString.includes('(home)')) return '/(home)';
+    
+    // Check for specific page names
+    if (segmentString.includes('log')) return '/(log)';
+    if (segmentString.includes('track')) return '/(track)';
+    if (segmentString.includes('scan')) return '/(scan)';
+    if (segmentString.includes('profile')) return '/(profile)';
+    
+    return '/(home)'; // default fallback
+  };
+  
+  const currentRoute = getCurrentRoute();
   
   const handleNav = (route: string) => {
     if (route !== currentRoute) {
       console.log('Navigating from', currentRoute, 'to', route);
-      router.push(route as any);
+      router.replace(route as any);
     }
   };
 

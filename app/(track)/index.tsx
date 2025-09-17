@@ -3,6 +3,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from '../../constants/Config';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Alert, Platform } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from '@expo/vector-icons';
+import ExerciseSuggestions from '../../components/ExerciseSuggestions';
+
+// User profile interface matching Home page
+interface UserProfile {
+  age?: number;
+  gender?: string;
+  weight?: number;
+  height?: number;
+  bodyGoal?: string;
+  bmi?: number;
+}
 
 // Backend food item shape (capitalized keys from Python service)
 interface FoodRecommendation {
@@ -51,6 +63,10 @@ export default function TrackPage() {
   const [showGroceryList, setShowGroceryList] = useState(false);
   const [groceryItems, setGroceryItems] = useState<string[]>([]);
   const [showMealPrepTips, setShowMealPrepTips] = useState(false);
+  
+  // Exercise suggestions state
+  const [exerciseSuggestionsVisible, setExerciseSuggestionsVisible] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // (Removed standalone food recommendations state)
   const [profile, setProfile] = useState<{ userId: number; weight?: number; height?: number } | null>(null);
@@ -104,6 +120,67 @@ export default function TrackPage() {
       }
     };
     fetchDailyIntake();
+  }, []);
+
+  // Load user profile for exercise suggestions
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const userId = await AsyncStorage.getItem('userId');
+        if (!userId) return;
+        
+        const response = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(userId)}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const userInfo = data.userInfo || data;
+          
+          let bmi = undefined;
+          if (userInfo.height && userInfo.weight) {
+            const heightInMeters = userInfo.height / 100;
+            bmi = Math.round((userInfo.weight / (heightInMeters * heightInMeters)) * 10) / 10;
+          }
+
+          // Map bodyGoalId to actual goal string
+          const getBodyGoalText = (goalId: any): string => {
+            switch (goalId) {
+              case 1:
+              case '1':
+                return 'Lose Weight';
+              case 2:
+              case '2':
+                return 'Gain Weight';
+              case 3:
+              case '3':
+                return 'Maintain Weight';
+              case 4:
+              case '4':
+                return 'Build Muscle';
+              default:
+                return 'General Fitness';
+            }
+          };
+
+          const profile: UserProfile = {
+            age: userInfo.age,
+            gender: userInfo.gender,
+            weight: userInfo.weight,
+            height: userInfo.height,
+            bodyGoal: getBodyGoalText(userInfo.bodyGoalId || userInfo.bodyGoal),
+            bmi: bmi
+          };
+
+          setUserProfile(profile);
+          console.log('Track Page - User Profile Loaded:', profile); // Debug log
+        }
+      } catch (error) {
+        console.error('Track Page - Error loading user profile:', error);
+      }
+    };
+    loadUserProfile();
   }, []);
 
   // Fetch recommendations and weekly meal plan
@@ -291,6 +368,27 @@ export default function TrackPage() {
           </TouchableOpacity>
         </View>
 
+        {/* Exercise Section */}
+        <View style={styles.exerciseSection}>
+          <View style={styles.exerciseHeader}>
+            <Text style={styles.sectionTitle}>Exercise</Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.exerciseSuggestionButton}
+            onPress={() => setExerciseSuggestionsVisible(true)}
+          >
+            <View style={styles.exerciseButtonContent}>
+              <Ionicons name="fitness" size={24} color="#FCB647" />
+              <Text style={styles.exerciseButtonText}>Get Exercise Suggestions</Text>
+              <Ionicons name="chevron-forward" size={20} color="#666" />
+            </View>
+            <Text style={styles.exerciseSubtext}>
+              Personalized based on your {userProfile?.bodyGoal || 'fitness goals'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Current Day Meal Plan (derived from weeklyMealPlan) */}
         <View style={styles.mealPlanSection}>
           <Text style={styles.sectionTitle}>Today's Meal Plan</Text>
@@ -422,6 +520,14 @@ export default function TrackPage() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* Exercise Suggestions Modal */}
+      <ExerciseSuggestions 
+        visible={exerciseSuggestionsVisible}
+        onClose={() => setExerciseSuggestionsVisible(false)}
+        bodyGoal={userProfile?.bodyGoal}
+        bmi={userProfile?.bmi}
+      />
     </SafeAreaView>
   );
 }
@@ -881,5 +987,44 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#4CAF50',
     borderRadius: 5,
+  },
+  
+  // Exercise Section Styles
+  exerciseSection: {
+    marginTop: 24,
+    marginBottom: 24,
+  },
+  exerciseHeader: {
+    marginBottom: 16,
+  },
+  exerciseSuggestionButton: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  exerciseButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  exerciseButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    flex: 1,
+    marginLeft: 12,
+  },
+  exerciseSubtext: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 36,
   },
 });

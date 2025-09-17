@@ -1,4 +1,4 @@
-import { View, Text, Button, Image, TextInput, TouchableOpacity, Alert, Dimensions } from "react-native";
+import { View, Text, Button, Image, TextInput, TouchableOpacity, Alert, Dimensions, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from "react";
@@ -82,17 +82,18 @@ export default function RegisterScreen() {
 
   
   return (
-    <SafeAreaView style={{ flex: 1, justifyContent: "flex-start", alignItems: "center", backgroundColor: "white",}}>
-      <View>
-        <Image
-          source={require("../../assets/images/foodGapp.png")}
-          style={{
-            width: width * 0.71,
-            height: width * 0.71,
-            resizeMode: "contain",
-          }}
-        />
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+      <ScrollView contentContainerStyle={{ alignItems: "center", paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
+        <View>
+          <Image
+            source={require("../../assets/images/foodGapp.png")}
+            style={{
+              width: width * 0.71,
+              height: width * 0.71,
+              resizeMode: "contain",
+            }}
+          />
+        </View>
       <View style={{gap:50, width: "90%", position: "relative"}}>
         <View style={{ position: "relative"}}>
           <TextInput
@@ -175,6 +176,57 @@ export default function RegisterScreen() {
                 color="gray"
               />
             </TouchableOpacity>
+            
+            {/* Privacy Policy Scrollable Box */}
+            <View style={{
+              borderWidth: 1,
+              borderColor: '#ccc',
+              borderRadius: 8,
+              height: 120,
+              marginTop: 15,
+              marginBottom: 15,
+              backgroundColor: '#fafafa',
+            }}>
+              <ScrollView 
+                style={{ flex: 1 }} 
+                contentContainerStyle={{ padding: 10 }}
+                showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
+              >
+                <Text style={{ fontSize: 12, color: '#333', lineHeight: 18 }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: 14 }}>Privacy Policy</Text>{'\n\n'}
+                  By registering, you agree to our Privacy Policy. We respect your privacy and are committed to protecting your personal data.{'\n\n'}
+                  
+                  <Text style={{ fontWeight: 'bold' }}>Information We Collect:</Text>{'\n'}
+                  • Personal information (name, email, age, weight, height){'\n'}
+                  • Food logging data and dietary preferences{'\n'}
+                  • Usage analytics and app performance data{'\n'}
+                  • Device information and location data{'\n\n'}
+                  
+                  <Text style={{ fontWeight: 'bold' }}>How We Use Your Data:</Text>{'\n'}
+                  • To provide personalized nutrition recommendations{'\n'}
+                  • To track your health and fitness progress{'\n'}
+                  • To improve our services and user experience{'\n'}
+                  • To send you relevant notifications and updates{'\n\n'}
+                  
+                  <Text style={{ fontWeight: 'bold' }}>Data Protection:</Text>{'\n'}
+                  • Your data will not be shared with third parties without your consent{'\n'}
+                  • We use industry-standard security measures{'\n'}
+                  • You have the right to access, modify, or delete your data{'\n'}
+                  • Data is encrypted both in transit and at rest{'\n\n'}
+                  
+                  <Text style={{ fontWeight: 'bold' }}>Your Rights:</Text>{'\n'}
+                  • Right to access your personal data{'\n'}
+                  • Right to correct inaccurate data{'\n'}
+                  • Right to delete your account and data{'\n'}
+                  • Right to data portability{'\n\n'}
+                  
+                  For more information, contact support@wellnu.com{'\n\n'}
+                  Last updated: September 2025
+                </Text>
+              </ScrollView>
+            </View>
+            
             <View style={{ flexDirection: "row", alignItems: "center"}}>
               <TouchableOpacity
                 onPress={() => setIsChecked(!isChecked)}
@@ -192,13 +244,7 @@ export default function RegisterScreen() {
                 {isChecked && <MaterialIcons name="check-circle" size={19} color="black" />}
               </TouchableOpacity>
               <Text style={{ fontSize: 14, color: "black" }}>
-                I agree to the{" "}
-                <Text
-                  style={{ fontWeight: "bold", color: "#007BFF", textDecorationLine: "underline" }}
-                  onPress={() => console.log("Open Privacy & Policy")}
-                >
-                  Privacy & Policy
-                </Text>
+                I agree to the <Text style={{ fontWeight: "bold" }}>Privacy Policy</Text>
               </Text>
             </View>
             <View>
@@ -229,90 +275,8 @@ export default function RegisterScreen() {
             </TouchableOpacity>
             </View>
         </View>  
-        <View style={{gap: 20, width: "100%"}}>
-        <View style={{ position: "relative"}}>
-          <TextInput
-            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
-            placeholder=""
-            value={firstName}
-            onChangeText={setFirstName}
-          />
-          <View style={{position: "absolute", top:-35}}>
-            <Text style={{fontSize: 20, fontWeight: "bold"}}>First Name</Text>
-          </View>
-        </View>
-        <View style={{ position: "relative"}}>
-          <TextInput
-            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
-            placeholder=""
-            value={lastName}
-            onChangeText={setLastName}
-          />
-          <View style={{position: "absolute", top:-35}}>
-            <Text style={{fontSize: 20, fontWeight: "bold"}}>Last Name</Text>
-          </View>
-        </View>
-        <View style={{ position: "relative"}}>
-          <TextInput
-            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
-            placeholder=""
-            value={age}
-            onChangeText={setAge}
-            keyboardType="numeric"
-          />
-          <View style={{position: "absolute", top:-35}}>
-            <Text style={{fontSize: 20, fontWeight: "bold"}}>Age</Text>
-          </View>
-        </View>
-        <View style={{ position: "relative"}}>
-          <TextInput
-            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
-            placeholder=""
-            value={weight}
-            onChangeText={setWeight}
-            keyboardType="numeric"
-          />
-          <View style={{position: "absolute", top:-35}}>
-            <Text style={{fontSize: 20, fontWeight: "bold"}}>Weight</Text>
-          </View>
-        </View>
-        <View style={{ position: "relative"}}>
-          <TextInput
-            style={{ height: 50, borderColor: "black", borderWidth: 1, paddingHorizontal: 10, borderRadius: 5, width: "100%" }}
-            placeholder=""
-            value={height}
-            onChangeText={setHeight}
-            keyboardType="numeric"
-          />
-          <View style={{position: "absolute", top:-35}}>
-            <Text style={{fontSize: 20, fontWeight: "bold"}}>Height</Text>
-          </View>
-        </View>
-        <View style={{ position: "relative"}}>
-          <Text style={{fontSize: 20, fontWeight: "bold", marginBottom: 5}}>Body Goal</Text>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            {[{id:1,label:'Lose Weight'},{id:2,label:'Maintain Weight'},{id:3,label:'Gain Weight'}].map(goal => (
-              <TouchableOpacity
-                key={goal.id}
-                style={{
-                  borderWidth: 1,
-                  borderColor: bodyGoalId === goal.id ? "#FCB647" : "#ccc",
-                  backgroundColor: bodyGoalId === goal.id ? "#FCB647" : "#fff",
-                  borderRadius: 20,
-                  paddingVertical: 10,
-                  paddingHorizontal: 16,
-                  marginVertical: 5,
-                  alignItems: "center"
-                }}
-                onPress={() => setBodyGoalId(goal.id)}
-              >
-                <Text style={{ color: bodyGoalId === goal.id ? "#fff" : "#FCB647", fontWeight: "bold" }}>{goal.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
       </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

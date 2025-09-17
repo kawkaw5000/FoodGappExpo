@@ -3,6 +3,24 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Animated }
 import { Ionicons } from '@expo/vector-icons';
 import UserExperienceService, { UserLevel } from '../services/UserExperienceService';
 
+/**
+ * Enhanced LevelBadge Component with Milestone System
+ * 
+ * Features:
+ * - Shows special cute food icons every 5 levels (5, 10, 15, 20)
+ * - Gold styling and glow effects for milestone levels
+ * - Pulse animation for milestone badges
+ * - Special milestone messages
+ * 
+ * Milestone Icons:
+ * Level 5: 🍎 (Fresh Start)
+ * Level 10: 🥑 (Healthy Choice)
+ * Level 15: 🥕 (Vitamin Victory)
+ * Level 20: 🌟 (Superstar)
+ * Level 25: 🏆 (Champion)
+ * Level 30: 💎 (Diamond Level)
+ */
+
 
 const styles = StyleSheet.create({
   container: {
@@ -43,11 +61,48 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
+  milestoneBadge: {
+    backgroundColor: '#FFD700', // Gold color for milestones
+    borderWidth: 3,
+    borderColor: '#FF6B6B',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  milestoneIndicator: {
+    backgroundColor: '#FF1744', // Brighter red for milestones
+    borderWidth: 3,
+    borderColor: '#FFD700',
+    shadowColor: '#FF1744',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+  },
+  milestoneGlow: {
+    position: 'absolute',
+    top: -5,
+    left: -5,
+    right: -5,
+    bottom: -5,
+    borderRadius: 35,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    opacity: 0.3,
+  },
   titleText: {
     marginTop: 4,
     textAlign: 'center',
     color: '#333',
     fontWeight: '500',
+  },
+  milestoneTitle: {
+    color: '#FFD700',
+    fontWeight: 'bold',
+    textShadowColor: '#FF6B6B',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   
   // Modal Styles
@@ -259,6 +314,11 @@ const LevelBadge: React.FC<LevelBadgeProps> = ({
   showDetails = false,
   onPress,
 }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Debug log to see what level we're getting
+  console.log('LevelBadge received level:', level, 'badge:', badge);
+
   const getSize = () => {
     switch (size) {
       case 'small':
@@ -270,7 +330,86 @@ const LevelBadge: React.FC<LevelBadgeProps> = ({
     }
   };
 
+  // Get milestone icon for every 5 levels
+  const getMilestoneIcon = (level: number): string | null => {
+    console.log('Checking milestone for level:', level);
+    if (level % 5 === 0 && level <= 30) {
+      const milestoneIcons: Record<number, string> = {
+        5: '🍎',    // Red Apple - Fresh start
+        10: '🥑',   // Avocado - Healthy fats
+        15: '🥕',   // Carrot - Vitamins
+        20: '🌟',   // Star - Achievement
+        25: '🏆',   // Trophy
+        30: '💎'    // Diamond
+      };
+      const icon = milestoneIcons[level] || null;
+      console.log('Milestone icon for level', level, ':', icon);
+      return icon;
+    }
+    return null;
+  };
+
+  // Check if this level recently passed a milestone (show small indicator)
+  const getRecentMilestone = (level: number): string | null => {
+    const lastMilestone = Math.floor(level / 5) * 5;
+    if (lastMilestone > 0 && level - lastMilestone <= 2 && level % 5 !== 0) {
+      // Show small version of last milestone icon for levels 1-2 after milestone
+      const milestoneIcons: Record<number, string> = {
+        5: '🍎',
+        10: '🥑', 
+        15: '🥕',
+        20: '🌟',
+        25: '🏆',
+        30: '💎'
+      };
+      return milestoneIcons[lastMilestone] || null;
+    }
+    return null;
+  };
+
+  // Get milestone messages
+  const getMilestoneMessage = (level: number): string => {
+    const milestoneMessages: Record<number, string> = {
+      5: 'Fresh Start! 🍎\nYou\'re building healthy habits!',
+      10: 'Healthy Choice! 🥑\nGreat progress on your journey!',
+      15: 'Vitamin Victory! 🥕\nYou\'re really getting stronger!',
+      20: 'Superstar! 🌟\nYou\'ve reached an amazing milestone!',
+      25: 'Champion! 🏆\nYou\'re a true health warrior!',
+      30: 'Diamond Level! 💎\nYou\'re absolutely incredible!'
+    };
+    return milestoneMessages[level] || `Level ${level} achieved!`;
+  };
+
   const sizes = getSize();
+  const milestoneIcon = getMilestoneIcon(level);
+  const recentMilestone = getRecentMilestone(level);
+  const isMilestone = milestoneIcon !== null;
+  const hasRecentMilestone = recentMilestone !== null;
+  
+  // Use milestone icon if current level is milestone, or recent milestone icon if just passed one
+  const displayIcon = isMilestone ? milestoneIcon : (hasRecentMilestone ? recentMilestone : badge);
+  const shouldShowMilestoneStyle = isMilestone || hasRecentMilestone;
+
+  // Pulse animation for milestone badges
+  useEffect(() => {
+    if (isMilestone) {
+      const pulse = () => {
+        Animated.sequence([
+          Animated.timing(scaleAnim, {
+            toValue: 1.1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ]).start(() => pulse());
+      };
+      pulse();
+    }
+  }, [isMilestone, scaleAnim]);
 
   return (
     <TouchableOpacity
@@ -281,15 +420,32 @@ const LevelBadge: React.FC<LevelBadgeProps> = ({
       onPress={onPress}
       disabled={!onPress}
     >
-      <View style={styles.badgeCircle}>
-        <Text style={[styles.badgeEmoji, { fontSize: sizes.badge }]}>{badge}</Text>
-        <View style={styles.levelIndicator}>
+      <Animated.View style={[
+        styles.badgeCircle, 
+        shouldShowMilestoneStyle && styles.milestoneBadge,
+        isMilestone && { transform: [{ scale: scaleAnim }] }
+      ]}>
+        <Text style={[styles.badgeEmoji, { fontSize: sizes.badge }]}>
+          {displayIcon}
+        </Text>
+        
+        <View style={[
+          styles.levelIndicator, 
+          shouldShowMilestoneStyle && styles.milestoneIndicator
+        ]}>
           <Text style={[styles.levelText, { fontSize: sizes.text - 2 }]}>{level}</Text>
         </View>
-      </View>
+        {isMilestone && (
+          <View style={styles.milestoneGlow} />
+        )}
+      </Animated.View>
       {showDetails && (
-        <Text style={[styles.titleText, { fontSize: sizes.text - 2 }]} numberOfLines={2}>
-          {title}
+        <Text style={[
+          styles.titleText, 
+          { fontSize: sizes.text - 2 },
+          shouldShowMilestoneStyle && styles.milestoneTitle
+        ]} numberOfLines={2}>
+          {isMilestone ? getMilestoneMessage(level).split('\n')[0] : title}
         </Text>
       )}
     </TouchableOpacity>

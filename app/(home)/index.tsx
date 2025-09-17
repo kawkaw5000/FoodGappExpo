@@ -6,6 +6,7 @@ import GetStarted from "./getStarted";
 import { Ionicons } from '@expo/vector-icons';
 import ChatbotScreen from "@/components/ChatbotScreen";
 import ShareModal from "@/components/ShareModal";
+import ExerciseSuggestions from "@/components/ExerciseSuggestions";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import UserExperienceService, { UserLevel } from "@/services/UserExperienceService";
 import { LevelBadge } from "@/components/LevelBadge";
@@ -83,6 +84,7 @@ export default function HomeScreen() {
   const [showGetStarted, setShowGetStarted] = useState(false);
   const [chatbotVisible, setChatbotVisible] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [exerciseSuggestionsVisible, setExerciseSuggestionsVisible] = useState(false);
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
   const [userName, setUserName] = useState<string>('');
   
@@ -98,10 +100,6 @@ export default function HomeScreen() {
   
   // WellNū Study: Meal suggestions state
   const [mealSuggestions, setMealSuggestions] = useState<MealSuggestion[]>([]);
-
-  const handleMealPress = (mealType: string) => {
-    router.push(`/(track)/track?meal=${mealType}`);
-  };
 
   // Load user data when screen focuses
   useFocusEffect(
@@ -288,16 +286,37 @@ export default function HomeScreen() {
           bmi = Math.round((userInfo.weight / (heightInMeters * heightInMeters)) * 10) / 10;
         }
 
+        // Map bodyGoalId to actual goal string
+        const getBodyGoalText = (goalId: any): string => {
+          switch (goalId) {
+            case 1:
+            case '1':
+              return 'Lose Weight';
+            case 2:
+            case '2':
+              return 'Gain Weight';
+            case 3:
+            case '3':
+              return 'Maintain Weight';
+            case 4:
+            case '4':
+              return 'Build Muscle';
+            default:
+              return 'General Fitness';
+          }
+        };
+
         const profile: UserProfile = {
           age: userInfo.age,
           gender: userInfo.gender,
           weight: userInfo.weight,
           height: userInfo.height,
-          bodyGoal: userInfo.bodyGoalId,
+          bodyGoal: getBodyGoalText(userInfo.bodyGoalId || userInfo.bodyGoal),
           bmi: bmi
         };
 
         setUserProfile(profile);
+        console.log('User Profile Loaded:', profile); // Debug log
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
@@ -574,47 +593,20 @@ export default function HomeScreen() {
         <View style={styles.exerciseSection}>
           <View style={styles.exerciseHeader}>
             <Text style={styles.sectionTitle}>Exercise</Text>
-            <TouchableOpacity>
-              <Ionicons name="add" size={24} color="#FCB647" />
-            </TouchableOpacity>
           </View>
-          <View style={styles.weekDays}>
-            {[11, 12, 13, 14, 15].map((day, index) => (
-              <View key={day} style={[styles.dayCircle, index === 4 && styles.activeDayCircle]}>
-                <Text style={[styles.dayText, index === 4 && styles.activeDayText]}>{day}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Meals Section */}
-        <View style={styles.mealsSection}>
-          <Text style={styles.sectionTitle}>Meals</Text>
           
-          <TouchableOpacity style={styles.mealItem} onPress={() => handleMealPress('Breakfast')}>
-            <View style={styles.mealIcon}>
-              <Ionicons name="sunny" size={20} color="#FF6B6B" />
+          <TouchableOpacity 
+            style={styles.exerciseSuggestionButton}
+            onPress={() => setExerciseSuggestionsVisible(true)}
+          >
+            <View style={styles.exerciseButtonContent}>
+              <Ionicons name="fitness" size={24} color="#FCB647" />
+              <Text style={styles.exerciseButtonText}>Get Exercise Suggestions</Text>
+              <Ionicons name="chevron-forward" size={20} color="#666" />
             </View>
-            <Text style={styles.mealLabel}>Breakfast</Text>
-            <View style={styles.mealStatus}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.mealItem} onPress={() => handleMealPress('Lunch')}>
-            <View style={styles.mealIcon}>
-              <Ionicons name="partly-sunny" size={20} color="#FFB74D" />
-            </View>
-            <Text style={styles.mealLabel}>Lunch</Text>
-            <View style={styles.mealStatusEmpty} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.mealItem} onPress={() => handleMealPress('Dinner')}>
-            <View style={styles.mealIcon}>
-              <Ionicons name="moon" size={20} color="#9C27B0" />
-            </View>
-            <Text style={styles.mealLabel}>Dinner</Text>
-            <View style={styles.mealStatusEmpty} />
+            <Text style={styles.exerciseSubtext}>
+              Personalized based on your {userProfile?.bodyGoal || 'fitness goals'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -712,6 +704,13 @@ export default function HomeScreen() {
         visible={shareModalVisible} 
         onClose={() => setShareModalVisible(false)} 
         shareData={getShareData()}
+      />
+
+      <ExerciseSuggestions 
+        visible={exerciseSuggestionsVisible}
+        onClose={() => setExerciseSuggestionsVisible(false)}
+        bodyGoal={userProfile?.bodyGoal}
+        bmi={userProfile?.bmi}
       />
 
       {/* WellNū Study: Education Modal */}
@@ -907,28 +906,30 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  weekDays: {
+  exerciseSuggestionButton: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  exerciseButtonContent: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  dayCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  activeDayCircle: {
-    backgroundColor: '#FCB647',
-  },
-  dayText: {
-    fontSize: 14,
-    fontWeight: 'bold',
+  exerciseButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
+    flex: 1,
+    marginLeft: 12,
   },
-  activeDayText: {
-    color: 'white',
+  exerciseSubtext: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
   mealsSection: {
     backgroundColor: 'white',
@@ -936,36 +937,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 15,
     padding: 20,
-  },
-  mealItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  mealIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f8f8f8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  mealLabel: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  mealStatus: {
-    marginLeft: 10,
-  },
-  mealStatusEmpty: {
-    width: 20,
-    height: 20,
-    marginLeft: 10,
   },
   chatbotButton: {
     position: 'absolute',

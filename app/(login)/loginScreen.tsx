@@ -122,9 +122,11 @@ export default function LoginScreen() {
           backgroundColor="#FCB647"
           textColor="white"
         />
-        <Text style={{ fontSize: 12, fontWeight: "bold", textAlign: "center", textDecorationLine: "underline", color: "#6D7ABC" }}>
-          Forgot password?
-        </Text>
+        <TouchableOpacity onPress={() => router.push("/(login)/ForgotPasswordScreen")}>
+          <Text style={{ fontSize: 12, fontWeight: "bold", textAlign: "center", textDecorationLine: "underline", color: "#6D7ABC" }}>
+            Forgot password?
+          </Text>
+        </TouchableOpacity>
         <View style={{ borderBottomWidth: 1, borderBottomColor: "black", width: "auto" }} />
         <View>
           <CustomButton

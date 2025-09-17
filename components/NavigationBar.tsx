@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Image, ImageSourcePropType, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ImageSourcePropType, StyleSheet, Animated } from 'react-native';
 
 interface NavItem {
   name: string;
@@ -17,8 +17,6 @@ interface BottomNavBarProps {
 const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handleNav }) => {
   const animationValues = useRef<Record<string, Animated.Value>>({});
   const navItems = NavImg();
-  const screenWidth = Dimensions.get('window').width;
-  const indicatorWidth = screenWidth / navItems.length;
 
   // Initialize animation values for each nav item
   useEffect(() => {
@@ -31,31 +29,63 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handl
 
   // Helper function to check if current route matches the nav item
   const isRouteActive = (navRoute: string, currentPath: string) => {
-    // Normalize both routes: remove parentheses, leading/trailing slashes
-    const normalize = (str: string) => str.replace(/[()]/g, '').replace(/\/$/, '').replace(/^\//, '');
-    const nav = normalize(navRoute);
-    const curr = normalize(currentPath);
-    // Match if equal or if current path starts with nav route (for nested)
-    return curr === nav || curr.startsWith(nav + '/');
+    console.log(`Checking "${navRoute}" vs "${currentPath}"`);
+    
+    // Direct match first
+    if (currentPath === navRoute) {
+      console.log(`Direct match found`);
+      return true;
+    }
+    
+    // Extract the core route name without parentheses
+    const extractRouteCore = (route: string): string => {
+      const match = route.match(/\(([^)]+)\)/);
+      return match ? match[1] : route.replace(/[\/()]/g, '');
+    };
+    
+    const navCore = extractRouteCore(navRoute);
+    const pathCore = extractRouteCore(currentPath);
+    
+    console.log(`Core comparison: "${navCore}" vs "${pathCore}"`);
+    
+    // Check if path contains the nav route core
+    if (pathCore === navCore || currentPath.includes(navCore)) {
+      console.log(`Core match found`);
+      return true;
+    }
+    
+    // Special case for home route
+    if (navRoute === '/(home)' && (currentPath === '/' || currentPath === '/index' || currentPath === '')) {
+      console.log(`Home route match`);
+      return true;
+    }
+    
+    console.log(`No match found`);
+    return false;
   };
 
   // Get active index for indicator position
   const getActiveIndex = () => {
-    return navItems.findIndex(item => isRouteActive(item.route, currentRoute));
+    console.log(`=== Navigation Debug ===`);
+    console.log(`Current route: "${currentRoute}"`);
+    
+    let activeIndex = -1;
+    navItems.forEach((item, index) => {
+      const isActive = isRouteActive(item.route, currentRoute);
+      console.log(`${index}: ${item.name} (${item.route}) - Active: ${isActive}`);
+      if (isActive && activeIndex === -1) {
+        activeIndex = index;
+      }
+    });
+    
+    console.log(`Final active index: ${activeIndex}`);
+    console.log(`========================`);
+    
+    // Return the found index, or -1 if no match
+    return activeIndex;
   };
 
   const activeIndex = getActiveIndex();
-  const indicatorPosition = useRef(new Animated.Value(activeIndex * indicatorWidth)).current;
-
-  // Animate indicator position when route changes
-  useEffect(() => {
-    Animated.spring(indicatorPosition, {
-      toValue: activeIndex * indicatorWidth,
-      useNativeDriver: false,
-      tension: 100,
-      friction: 8,
-    }).start();
-  }, [activeIndex, indicatorPosition, indicatorWidth]);
 
   // Animate icon press
   const handlePressIn = (itemName: string) => {
@@ -87,21 +117,6 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handl
 
   return (
     <View style={styles.container}>
-      {/* Active Indicator */}
-      <Animated.View 
-        style={[
-          styles.activeIndicator,
-          {
-            width: indicatorWidth * 0.6,
-            left: indicatorPosition.interpolate({
-              inputRange: [0, screenWidth],
-              outputRange: [indicatorWidth * 0.2, screenWidth - (indicatorWidth * 0.2)],
-              extrapolate: 'clamp',
-            }),
-          }
-        ]} 
-      />
-      
       {/* Navigation Items */}
       <View style={styles.bottomBar}>
         {navItems.map((item, index) => {
@@ -137,7 +152,10 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handl
               >
                 <Image
                   source={isActive ? item.highlight : item.icon}
-                  style={[styles.icon, isActive && styles.activeIcon, isActive && { tintColor: '#FCB647' }]}
+                  style={[
+                    styles.icon, 
+                    isActive && styles.activeIcon
+                  ]}
                 />
               </Animated.View>
               <Animated.Text
@@ -190,15 +208,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   
-  activeIndicator: {
-    position: 'absolute',
-    top: 0,
-    height: 3,
-    backgroundColor: "#FCB647",
-    borderBottomLeftRadius: 2,
-    borderBottomRightRadius: 2,
-  },
-  
   bottomBar: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -246,7 +255,7 @@ const styles = StyleSheet.create({
   },
   
   iconLabelActive: {
-    color: "#fff",
+    color: "#FCB647",
     fontWeight: "bold",
     fontSize: 12,
   },
