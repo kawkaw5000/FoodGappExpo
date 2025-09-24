@@ -8,6 +8,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LevelBadge } from '@/components/LevelBadge';
 import Config from '@/constants/Config';
 
+// Helper function to convert integer gender to display string
+const getGenderDisplay = (gender: number | null | undefined): string => {
+  if (gender === 0) return 'Male';
+  if (gender === 1) return 'Female';
+  if (gender === 2) return 'Others';
+  return '-';
+};
+
 interface UserProfile {
   userId: number;
   email: string;
@@ -16,6 +24,7 @@ interface UserProfile {
   weight?: number;
   height?: number;
   age?: number;
+  gender?: number; // 0 = Male, 1 = Female, 2 = Others
   bodyGoalId?: number;
   isActive?: boolean;
 }
@@ -56,10 +65,15 @@ export default function ProfileScreen() {
         if (!userId) return;
 
         // Fetch profile
-        const profileRes = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(userId)}`);
+        const profileRes = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(userId)}`, {
+          credentials: "include"
+        });
         if (profileRes.ok) {
           const data = await profileRes.json();
+          console.log('🔍 Full API Response:', JSON.stringify(data, null, 2));
           const userInfo = data.userInfo || data;
+          console.log('👤 User Info:', JSON.stringify(userInfo, null, 2));
+          console.log('⚧️ Gender Value:', userInfo.gender);
           setProfile({
             userId: userInfo.userId,
             email: userInfo.email,
@@ -68,20 +82,25 @@ export default function ProfileScreen() {
             weight: userInfo.weight,
             height: userInfo.height,
             age: userInfo.age,
+            gender: userInfo.gender,
             bodyGoalId: userInfo.bodyGoalId,
             isActive: userInfo.isActive
           });
         }
 
         // Fetch level
-        const levelRes = await fetch(`${Config.Account_API}/user-level/${encodeURIComponent(userId)}`);
+        const levelRes = await fetch(`${Config.Account_API}/user-level/${encodeURIComponent(userId)}`, {
+          credentials: "include"
+        });
         if (levelRes.ok) {
           const levelData = await levelRes.json();
           setUserLevel(levelData);
         }
 
         // Fetch achievements (optional, if backend supports)
-        const achRes = await fetch(`${Config.Account_API}/user-achievements/${encodeURIComponent(userId)}`);
+        const achRes = await fetch(`${Config.Account_API}/user-achievements/${encodeURIComponent(userId)}`, {
+          credentials: "include"
+        });
         if (achRes.ok) {
           const achData = await achRes.json();
           setAchievements(Array.isArray(achData) ? achData : []);
@@ -161,10 +180,10 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>
-                <Text style={styles.infoIcon}>📧</Text>
-                <Text style={styles.infoLabel}>Email</Text>
+                <Text style={styles.infoIcon}>⚧️</Text>
+                <Text style={styles.infoLabel}>Gender</Text>
               </View>
-              <Text style={styles.infoValue}>{profile?.email || 'Not set'}</Text>
+              <Text style={styles.infoValue}>{getGenderDisplay(profile?.gender)}</Text>
             </View>
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>

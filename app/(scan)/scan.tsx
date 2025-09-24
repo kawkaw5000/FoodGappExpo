@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from "../../constants/Config";
 import UserExperienceService from "../../services/UserExperienceService";
 import XPNotification from "../../components/XPNotification";
+import { WellNuAlertService } from "../../services/WellNuAlertService";
 
 export default function ScanPage() {
   const router = useRouter();
@@ -119,8 +120,6 @@ export default function ScanPage() {
         body_goal: "maintain weight",
         date: new Date().toISOString()
       };
-  // ...existing code...
-
       const nutritionRes = await fetch(Config.NUTRITION_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -143,10 +142,12 @@ export default function ScanPage() {
           // Simplified nutrition log
           console.log(`[Nutrition] ${foodName} (${foodObj.FoodGramAmount}g): ${foodObj.Calories} kcal, ${foodObj.Protein}g P, ${foodObj.Fat}g F, ${foodObj.Carbs}g C`);
           setNutritionData({
-            calories: Number(foodObj.Calories ?? 0),
-            protein: Number(foodObj.Protein ?? 0),
-            fats: Number(foodObj.Fat ?? 0),
-            carbs: Number(foodObj.Carbs ?? 0)
+            calories: fmt2(foodObj.Calories),
+            protein: fmt2(foodObj.Protein),
+            fats: fmt2(foodObj.Fat),
+            carbs: fmt2(foodObj.Carbs),
+            sugar: fmt2(foodObj.Sugar),
+            micronutrients: foodObj.MicroNutrients || ""
           });
           setShowNutritionModal(true);
         } else {
@@ -183,10 +184,11 @@ export default function ScanPage() {
         FoodName: foodName,
         Grams: parseFloat(grams),
         MealType: mealType,
-        Calories: nutritionData?.calories?.toString() || "0",
-        Protein: nutritionData?.protein?.toString() || "0",
-        Fat: nutritionData?.fats?.toString() || "0",
-        Carbs: nutritionData?.carbs?.toString() || "0",
+        Calories: fmt2(nutritionData?.calories).toString(),
+        Protein: fmt2(nutritionData?.protein).toString(),
+        Fat: fmt2(nutritionData?.fats).toString(),
+        Carbs: fmt2(nutritionData?.carbs).toString(),
+        Sugar: fmt2(nutritionData?.sugar).toString(),
       };
 
       console.log("Logging payload (/log):", logPayload);
@@ -256,8 +258,8 @@ export default function ScanPage() {
         setMealType("Breakfast");
         setNutritionData(null);
         
-  // Award XP for food logging (frontend UI). Backend may also award XP.
-  await awardXP(50, 'Food Logged');
+        // Award XP for food logging (frontend UI). Backend may also award XP.
+        await awardXP(50, 'Food Logged');
         
         // Navigate back to log page after 2 seconds to show the updated logs
         setTimeout(() => {
@@ -275,6 +277,8 @@ export default function ScanPage() {
       setLoading(false);
     }
   };
+
+
 
   const handleNutritionFetch = async () => {
     setLoadingNutrition(true);
@@ -308,7 +312,7 @@ export default function ScanPage() {
       cholesterol: 0,
       sodium: 0,
       dietary_fiber: 0,
-      sugars: 0,
+      sugars: 0, // Will be extracted from nutritionText
       vitamin_d: 0,
       calcium: 0,
       iron: 0,
@@ -345,6 +349,17 @@ export default function ScanPage() {
     nutrition.vitamin_c = extractValue('Vitamin C');
 
     return nutrition;
+  };
+
+  // Helper: format number to at most 2 decimals
+  const fmt2 = (n: number | string | undefined | null): number => {
+    const v = Number(n ?? 0);
+    return Number.isFinite(v) ? Number(v.toFixed(2)) : 0;
+  };
+
+  // Helper: safely extract sugar value from various possible field names
+  const extractSugarValue = (obj: any): number => {
+    return fmt2(obj?.sugars || obj?.Sugar || obj?.sugar || 0);
   };
 
   if (!cameraPermission) {
@@ -463,28 +478,40 @@ export default function ScanPage() {
                 ) : nutritionData ? (
                   <>
                     <View style={styles.caloriesSection}>
-                      <Text style={styles.caloriesText}>{Number(nutritionData.calories || 0).toFixed(1)} cal</Text>
+                      <Text style={styles.caloriesText}>{fmt2(nutritionData.calories).toString()} cal</Text>
                     </View>
                     <View style={styles.macrosSection}>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Protein</Text>
-                        <Text style={[styles.macroValue, {color: '#FF5722'}]}>{Number(
-                          nutritionData.protein ?? nutritionData.Protein ?? 0
-                        ).toFixed(1)}g</Text>
+                        <Text style={[styles.macroValue, {color: '#FF5722'}]}>{fmt2(
+                          nutritionData.protein ?? (nutritionData as any).Protein ?? 0
+                        ).toString()}g</Text>
                       </View>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Fats</Text>
-                        <Text style={[styles.macroValue, {color: '#FF9800'}]}>{Number(
-                          nutritionData.fats ?? nutritionData.fat ?? nutritionData.Fat ?? 0
-                        ).toFixed(1)}g</Text>
+                        <Text style={[styles.macroValue, {color: '#FF9800'}]}>{fmt2(
+                          nutritionData.fats ?? (nutritionData as any).fat ?? (nutritionData as any).Fat ?? 0
+                        ).toString()}g</Text>
                       </View>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Carbs</Text>
-                        <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{Number(
-                          nutritionData.carbs ?? nutritionData.carbohydrates ?? nutritionData.Carbs ?? 0
-                        ).toFixed(1)}g</Text>
+                        <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{fmt2(
+                          nutritionData.carbs ?? (nutritionData as any).carbohydrates ?? (nutritionData as any).Carbs ?? 0
+                        ).toString()}g</Text>
+                      </View>
+                      <View style={styles.macroItem}>
+                        <Text style={styles.macroLabel}>Sugar</Text>
+                        <Text style={[styles.macroValue, {color: '#9C27B0'}]}>{fmt2(
+                          nutritionData.sugar ?? (nutritionData as any).Sugar ?? 0
+                        ).toString()}g</Text>
                       </View>
                     </View>
+                    {nutritionData.micronutrients && (
+                      <View style={styles.micronutrientsSection}>
+                        <Text style={styles.micronutrientsLabel}>Micronutrients:</Text>
+                        <Text style={styles.micronutrientsText}>{nutritionData.micronutrients}</Text>
+                      </View>
+                    )}
                   </>
                 ) : (
                   <Text style={styles.errorText}>No nutrition data available</Text>
@@ -743,5 +770,22 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: "#ccc",
     opacity: 0.6,
+  },
+  micronutrientsSection: {
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  micronutrientsLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  micronutrientsText: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 18,
   },
 });

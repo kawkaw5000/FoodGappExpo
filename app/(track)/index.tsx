@@ -2,9 +2,10 @@ import React, { useState, useEffect } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from '../../constants/Config';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Alert, Platform } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
 import ExerciseSuggestions from '../../components/ExerciseSuggestions';
+import { calculateBMI, getCalorieRecommendations } from '../../utils/bmiCalculator';
 
 // User profile interface matching Home page
 interface UserProfile {
@@ -43,6 +44,59 @@ interface MealPlan {
   totalCarbs: number;
 }
 
+// Enhanced nutrition summary interface for daily tracking
+interface DailyNutritionSummary {
+  totalCalories: number;
+  totalProtein: number;
+  totalFats: number;
+  totalCarbs: number;
+  totalSugars: number; // Add sugar tracking
+  goalCalories: number;
+  goalProtein: number;
+  goalFats: number;
+  goalCarbs: number;
+  goalSugars: number; // Add sugar goal tracking (WHO: <50g/day)
+  caloriesProgress: number;
+  proteinProgress: number;
+  fatsProgress: number;
+  carbsProgress: number;
+  sugarsProgress: number; // Add sugar progress tracking
+}
+
+// Nutrition insight for notifications and alerts
+interface NutritionInsight {
+  type: 'warning' | 'success' | 'info';
+  message: string;
+  icon: string;
+}
+
+// Interface for logged food items from the log API
+interface LoggedFood {
+  id: string;
+  foodId?: number;
+  foodLogId?: number;
+  name: string;
+  calories: number;
+  protein: number;
+  fats: number;
+  carbs: number;
+  sugars: number; // Make sugar required since we're now using it
+  meal: string;
+  grams?: number;
+  loggedDate?: string; // Date when food was logged
+  cholesterol?: number;
+  sodium?: number;
+  fiber?: number;
+  vitaminD?: number;
+  calcium?: number;
+  iron?: number;
+  potassium?: number;
+  vitaminA?: number;
+  vitaminC?: number;
+  nutrientLogId?: number;
+  micronutrients?: string; // Add micronutrients field
+}
+
 export default function TrackPage() {
   // Daily log state
   // Daily log (currently unused since we rely on generated meal plan per day)
@@ -58,6 +112,45 @@ export default function TrackPage() {
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     return days[new Date().getDay()];
   }
+
+  // Filter logged foods for today's date (more inclusive to handle different time zones)
+  const getTodaysLoggedFoods = (): LoggedFood[] => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    
+    return loggedFoods.filter(food => {
+      if (!food.loggedDate) return false;
+      
+      try {
+        const foodDate = new Date(food.loggedDate);
+        return foodDate >= todayStart && foodDate < todayEnd;
+      } catch (error) {
+        // If date parsing fails, check string format
+        const foodDateStr = food.loggedDate.split('T')[0];
+        const todayStr = now.toISOString().split('T')[0];
+        return foodDateStr === todayStr;
+      }
+    });
+  };
+
+  // Format date without time for cleaner display
+  const formatLoggedDate = (dateString: string | undefined): string => {
+    if (!dateString) return 'Date not available';
+    
+    try {
+      const date = new Date(dateString);
+      const isToday = date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+      
+      if (isToday) {
+        return 'Today';
+      } else {
+        return date.toLocaleDateString();
+      }
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
   const [currentDay, setCurrentDay] = useState(getTodayName());
   // Removed Weekly View state
   const [showGroceryList, setShowGroceryList] = useState(false);
@@ -71,10 +164,52 @@ export default function TrackPage() {
   // (Removed standalone food recommendations state)
   const [profile, setProfile] = useState<{ userId: number; weight?: number; height?: number } | null>(null);
 
-  // Daily Calorie Intake state
-  const [dailyCalorieIntake, setDailyCalorieIntake] = useState<number | null>(null);
-  const [calorieGoal, setCalorieGoal] = useState<number>(2000); // You can make this dynamic if needed
-  const [loadingCalorieIntake, setLoadingCalorieIntake] = useState<boolean>(false);
+  // Calorie goal (dynamic based on user profile)
+  const [calorieGoal, setCalorieGoal] = useState<number>(2000);
+
+  // Get personalized calorie goal based on user profile and body goal (same as home page)
+  const calculatePersonalizedCalorieGoal = (profile: UserProfile | null): number => {
+    if (profile && profile.weight && profile.height && profile.age && profile.gender !== undefined) {
+      const currentBMI = calculateBMI(profile.weight, profile.height);
+      const genderNumber = typeof profile.gender === 'string' ? 
+        (profile.gender.toLowerCase() === 'male' ? 0 : profile.gender.toLowerCase() === 'female' ? 1 : 2) : 
+        profile.gender;
+      
+      const calorieRecs = getCalorieRecommendations({
+        weight: profile.weight,
+        height: profile.height,
+        age: profile.age,
+        gender: genderNumber,
+        activityLevel: 'moderate'
+      }, currentBMI);
+
+      // Map body goal to appropriate calorie target
+      switch (profile.bodyGoal) {
+        case 'Lose Weight':
+          return Math.round(calorieRecs.goals.loseWeight.calories);
+        case 'Gain Weight':
+          return Math.round(calorieRecs.goals.gainWeight.calories);
+        case 'Maintain Weight':
+          return Math.round(calorieRecs.goals.maintain.calories);
+        case 'Build Muscle':
+          return Math.round(calorieRecs.goals.gainWeight.calories); // Muscle building needs surplus
+        default:
+          return Math.round(calorieRecs.goals.maintain.calories);
+      }
+    }
+    return 2000; // Fallback if no profile data
+  };
+
+  const getPersonalizedCalorieGoal = (): number => {
+    return calculatePersonalizedCalorieGoal(userProfile);
+  };
+
+  // Nutrition tracking state (moved from Log tab)
+  const [loggedFoods, setLoggedFoods] = useState<LoggedFood[]>([]);
+  const [dailySummary, setDailySummary] = useState<DailyNutritionSummary | null>(null);
+  const [nutritionInsights, setNutritionInsights] = useState<NutritionInsight[]>([]);
+  const [showInsights, setShowInsights] = useState(true);
+  const [loadingNutritionData, setLoadingNutritionData] = useState(false);
 
   // Fetch user profile from backend
   useEffect(() => {
@@ -99,28 +234,7 @@ export default function TrackPage() {
     fetchProfile();
   }, []);
 
-  // Fetch daily calorie intake
-  useEffect(() => {
-    const fetchDailyIntake = async () => {
-      setLoadingCalorieIntake(true);
-      try {
-        const userId = await AsyncStorage.getItem('userId');
-        if (!userId) return;
-        const response = await fetch(`${Config.API_BASE}/api/foodlogging/getDailyIntake?userId=${encodeURIComponent(userId)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setDailyCalorieIntake(data.calorieIntake ?? 0);
-        } else {
-          setDailyCalorieIntake(null);
-        }
-      } catch (err) {
-        setDailyCalorieIntake(null);
-      } finally {
-        setLoadingCalorieIntake(false);
-      }
-    };
-    fetchDailyIntake();
-  }, []);
+
 
   // Load user profile for exercise suggestions
   useEffect(() => {
@@ -144,7 +258,7 @@ export default function TrackPage() {
             bmi = Math.round((userInfo.weight / (heightInMeters * heightInMeters)) * 10) / 10;
           }
 
-          // Map bodyGoalId to actual goal string
+          // Map bodyGoalId to actual goal string (CORRECTED MAPPING)
           const getBodyGoalText = (goalId: any): string => {
             switch (goalId) {
               case 1:
@@ -152,10 +266,10 @@ export default function TrackPage() {
                 return 'Lose Weight';
               case 2:
               case '2':
-                return 'Gain Weight';
+                return 'Maintain Weight';  // FIXED: Was incorrectly "Gain Weight"
               case 3:
               case '3':
-                return 'Maintain Weight';
+                return 'Gain Weight';      // FIXED: Was incorrectly "Maintain Weight"
               case 4:
               case '4':
                 return 'Build Muscle';
@@ -174,7 +288,13 @@ export default function TrackPage() {
           };
 
           setUserProfile(profile);
+          
+          // Update calorie goal based on profile
+          const personalizedGoal = calculatePersonalizedCalorieGoal(profile);
+          setCalorieGoal(personalizedGoal);
+          
           console.log('Track Page - User Profile Loaded:', profile); // Debug log
+          console.log('Track Page - Personalized Calorie Goal:', personalizedGoal); // Debug log
         }
       } catch (error) {
         console.error('Track Page - Error loading user profile:', error);
@@ -182,6 +302,255 @@ export default function TrackPage() {
     };
     loadUserProfile();
   }, []);
+
+  // Nutrition calculation functions (moved from Log tab)
+  
+  // Calculate daily nutrition summary
+  const calculateDailySummary = (foods: LoggedFood[]): DailyNutritionSummary => {
+    console.log("Calculating daily summary from foods:", foods.map(f => ({
+      name: f.name,
+      calories: f.calories,
+      protein: f.protein,
+      fats: f.fats,
+      carbs: f.carbs,
+      sugars: f.sugars
+    })));
+    
+    const totals = foods.reduce((acc, food) => ({
+      totalCalories: acc.totalCalories + food.calories,
+      totalProtein: acc.totalProtein + food.protein,
+      totalFats: acc.totalFats + food.fats,
+      totalCarbs: acc.totalCarbs + food.carbs,
+      totalSugars: acc.totalSugars + (food.sugars || 0), // Include sugar tracking
+    }), {
+      totalCalories: 0,
+      totalProtein: 0,
+      totalFats: 0,
+      totalCarbs: 0,
+      totalSugars: 0, // Initialize sugar total
+    });
+    
+    console.log("Calculated totals:", totals);
+
+    // Daily goals (can be made dynamic based on user profile)
+    const goals = {
+      goalCalories: calorieGoal || 2000,
+      goalProtein: 150,
+      goalFats: 65,
+      goalCarbs: 250,
+      goalSugars: 50, // WHO recommendation: <50g/day
+    };
+
+    return {
+      ...totals,
+      ...goals,
+      caloriesProgress: Math.min((totals.totalCalories / goals.goalCalories) * 100, 100),
+      proteinProgress: Math.min((totals.totalProtein / goals.goalProtein) * 100, 100),
+      fatsProgress: Math.min((totals.totalFats / goals.goalFats) * 100, 100),
+      carbsProgress: Math.min((totals.totalCarbs / goals.goalCarbs) * 100, 100),
+      sugarsProgress: Math.min((totals.totalSugars / goals.goalSugars) * 100, 100), // Add sugar progress
+    };
+  };
+
+  // Generate nutrition insights based on daily summary
+  const generateNutritionInsights = (summary: DailyNutritionSummary): NutritionInsight[] => {
+    const insights: NutritionInsight[] = [];
+
+    // Calorie insights
+    if (summary.caloriesProgress < 50) {
+      insights.push({
+        type: 'warning',
+        message: `You're at ${Math.round(summary.caloriesProgress)}% of your daily calorie goal. Consider adding a healthy snack!`,
+        icon: '⚠️'
+      });
+    } else if (summary.caloriesProgress > 100) {
+      insights.push({
+        type: 'info',
+        message: `You've exceeded your calorie goal by ${Math.round(summary.caloriesProgress - 100)}%. Try lighter options for your next meal.`,
+        icon: '📊'
+      });
+    } else if (summary.caloriesProgress >= 80) {
+      insights.push({
+        type: 'success',
+        message: `Great job! You're on track with ${Math.round(summary.caloriesProgress)}% of your calorie goal completed.`,
+        icon: '🎯'
+      });
+    }
+
+    // Protein insights
+    if (summary.proteinProgress < 60) {
+      insights.push({
+        type: 'warning',
+        message: `Your protein intake is at ${Math.round(summary.proteinProgress)}%. Add some eggs, fish, or beans to boost protein.`,
+        icon: '🥚'
+      });
+    } else if (summary.proteinProgress >= 90) {
+      insights.push({
+        type: 'success',
+        message: `Excellent protein intake! You've reached ${Math.round(summary.proteinProgress)}% of your goal.`,
+        icon: '💪'
+      });
+    }
+
+    // Sugar insights (WHO guidelines: <50g/day)
+    if (summary.sugarsProgress > 100) {
+      insights.push({
+        type: 'warning',
+        message: `⚠️ High sugar intake! You've consumed ${Math.round(summary.totalSugars)}g (${Math.round(summary.sugarsProgress)}%). WHO recommends <50g/day.`,
+        icon: '🍭'
+      });
+    } else if (summary.sugarsProgress > 75) {
+      insights.push({
+        type: 'info',
+        message: `You're at ${Math.round(summary.sugarsProgress)}% of the recommended sugar limit. Watch your sweet intake!`,
+        icon: '🚨'
+      });
+    } else if (summary.sugarsProgress < 25) {
+      insights.push({
+        type: 'success',
+        message: `Good job keeping sugar low! You're at ${Math.round(summary.sugarsProgress)}% of the daily limit.`,
+        icon: '✅'
+      });
+    }
+
+    // Balance insights
+    const isBalanced = summary.proteinProgress >= 70 && summary.fatsProgress >= 50 && summary.carbsProgress >= 50 && summary.sugarsProgress <= 75;
+    if (isBalanced && summary.caloriesProgress >= 80 && summary.caloriesProgress <= 110) {
+      insights.push({
+        type: 'success',
+        message: 'Your nutrition is well-balanced today! Keep up the great work.',
+        icon: '🌟'
+      });
+    }
+
+    return insights.slice(0, 3); // Limit to 3 insights to include sugar alerts
+  };
+
+  // Fetch logged foods and calculate nutrition data
+  const fetchNutritionData = async () => {
+    setLoadingNutritionData(true);
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) return;
+
+      const response = await fetch(`${Config.API_BASE}/api/foodlogging/getUserLogs?userId=${userId}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      console.log("Track tab - Raw API response:", data);
+      
+      if (response.ok && data.logs) {
+        console.log("Track tab - Using food data from database (Food table)");
+        
+        // Transform backend data to frontend format - using same logic as Log tab
+        const transformedLogs = data.logs
+          .filter((log: any) => log.nutrientData) // Only include logs with nutrition data
+          .map((log: any) => {
+            console.log("Track tab - Processing log:", log);
+            console.log("Track tab - Nutrient data:", log.nutrientData);
+            console.log("Track tab - Available date fields:", {
+              nutrientUpdatedAt: log.nutrientData?.updatedAt,
+              logUpdatedAt: log.updatedAt,
+              nutrientCreatedAt: log.nutrientData?.createdAt,
+              logCreatedAt: log.createdAt,
+              loggedDate: log.loggedDate,
+              dateLogged: log.dateLogged
+            });
+            
+            // Determine food name with multiple fallbacks (same as Log tab):
+            const foodName = log.foodData?.FoodName
+              || log.foodName
+              || log.nutrientData?.food?.FoodName
+              || `Food Entry ${log.foodId}`;
+            
+            return {
+              id: log.foodLogId.toString(),
+              foodId: log.foodId,
+              foodLogId: log.foodLogId,
+              name: foodName,
+              // Use the exact field names from NutrientLog table (same as Log tab)
+              calories: parseInt(log.nutrientData.calories) || 0,
+              protein: parseFloat(log.nutrientData.protein) || 0,
+              fats: parseFloat(log.nutrientData.fat) || 0, // 'fat' not 'fats'
+              carbs: parseFloat(log.nutrientData.carbs) || 0,
+              meal: log.mealType || 'Breakfast',
+              grams: parseFloat(log.nutrientData.foodGramAmount) || 100,
+              // Add logged date - prioritize updatedAt from NutrientLog table for accuracy
+              loggedDate: log.nutrientData?.updatedAt || log.updatedAt || log.nutrientData?.createdAt || log.createdAt || log.loggedDate || log.dateLogged || new Date().toISOString().split('T')[0],
+              // Additional nutrition data
+              cholesterol: 0,
+              sodium: 0,
+              fiber: 0,
+              sugars: 0,
+              vitaminD: 0,
+              calcium: 0,
+              iron: 0,
+              potassium: 0,
+              vitaminA: 0,
+              vitaminC: 0,
+              nutrientLogId: log.nutrientData.nutrientLogId,
+            };
+          });
+
+          console.log("Track tab - Transformed logs:", transformedLogs);
+          setLoggedFoods(transformedLogs);
+          
+          // Calculate nutrition summary and insights
+          if (transformedLogs.length > 0) {
+            // Filter for today's foods for more accurate daily summary
+            const todaysFoods = transformedLogs.filter((food: LoggedFood) => {
+              if (!food.loggedDate) return false;
+              try {
+                const now = new Date();
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                const foodDate = new Date(food.loggedDate);
+                return foodDate >= todayStart && foodDate < todayEnd;
+              } catch (error) {
+                const foodDateStr = food.loggedDate.split('T')[0];
+                const todayStr = new Date().toISOString().split('T')[0];
+                return foodDateStr === todayStr;
+              }
+            });
+            
+            console.log("All logged foods:", transformedLogs.length);
+            console.log("Today's foods for calculation:", todaysFoods.length);
+            
+            const summary = calculateDailySummary(todaysFoods);
+            setDailySummary(summary);
+            setNutritionInsights(generateNutritionInsights(summary));
+          } else {
+            setDailySummary(null);
+            setNutritionInsights([]);
+          }
+        } else {
+          console.error('Track tab - Failed to fetch logs:', data);
+          setLoggedFoods([]);
+        }
+      } catch (error) {
+        console.error('Track tab - Error fetching logs:', error);
+        setLoggedFoods([]);
+      } finally {
+        setLoadingNutritionData(false);
+      }
+    };
+
+  // Load nutrition data when component mounts
+  useEffect(() => {
+    fetchNutritionData();
+  }, [calorieGoal]);
+
+  // Refresh data when screen comes into focus (e.g., returning from log page)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log("Track tab - Screen focused, refreshing nutrition data");
+      fetchNutritionData();
+    }, [])
+  );
 
   // Fetch recommendations and weekly meal plan
 
@@ -325,26 +694,159 @@ export default function TrackPage() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Daily Calorie Intake Summary */}
+        {/* Daily Calorie Intake Summary - Consistent with Home Page */}
         <View style={styles.calorieSummaryContainer}>
-          <Text style={styles.calorieSummaryTitle}>🔥 Daily Calorie Intake</Text>
-          {loadingCalorieIntake ? (
+          <View style={styles.trackHeaderContainer}>
+            <Text style={styles.calorieSummaryTitle}>🔥 Daily Calorie Intake</Text>
+            {userProfile?.bodyGoal && (
+              <View style={styles.bodyGoalBadge}>
+                <Text style={styles.bodyGoalBadgeText}>{userProfile.bodyGoal}</Text>
+              </View>
+            )}
+          </View>
+          {loadingNutritionData ? (
             <ActivityIndicator size="small" color="#4CAF50" />
           ) : (
-            <>
-              <Text style={styles.calorieSummaryValue}>
-                {dailyCalorieIntake ?? 0} / {calorieGoal} kcal
-              </Text>
-              <View style={styles.calorieProgressBarBg}>
-                <View
-                  style={[
-                    styles.calorieProgressBarFill,
-                    { width: `${Math.min(((dailyCalorieIntake ?? 0) / calorieGoal) * 100, 100)}%` }
-                  ]}
-                />
+            <View style={styles.calorieDisplayContainer}>
+              {/* Left Side - Current Intake */}
+              <View style={styles.currentIntakeContainer}>
+                <Text style={styles.intakeNumber}>{Math.round(dailySummary?.totalCalories || 0)}</Text>
+                <Text style={styles.intakeLabel}>Current</Text>
+                <Text style={styles.intakeUnit}>cal</Text>
               </View>
-            </>
+              
+              {/* Middle - Progress Circle */}
+              <View style={styles.progressBadgeContainer}>
+                <View style={styles.progressCircle}>
+                  <Text style={styles.progressPercentage}>
+                    {Math.round(dailySummary?.caloriesProgress || 0)}%
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Right Side - Goal Calories */}
+              <View style={styles.goalIntakeContainer}>
+                <Text style={styles.goalNumber}>{calorieGoal.toLocaleString()}</Text>
+                <Text style={styles.goalLabel}>Goal</Text>
+                <Text style={styles.goalUnit}>kcal</Text>
+              </View>
+            </View>
           )}
+        </View>
+
+        {/* Enhanced Nutrition Summary (always visible) */}
+        <View style={styles.dailyNutritionSummary}>
+          <Text style={styles.nutritionSummaryTitle}>📊 Daily Nutrition Summary</Text>
+          <Text style={styles.nutritionNote}>📝 Go to the Log tab to add your meals</Text>
+          
+          {/* First Row - Primary Macros */}
+          <View style={styles.nutritionMacroGrid}>
+            <View style={styles.nutritionMacroCard}>
+              <Text style={styles.nutritionMacroLabel}>Protein</Text>
+              <Text style={styles.nutritionMacroValue}>{Math.round(dailySummary?.totalProtein || 0)}g</Text>
+              <View style={styles.nutritionProgressBar}>
+                <View style={[styles.nutritionProgressFill, { width: `${dailySummary?.proteinProgress || 0}%`, backgroundColor: '#4CAF50' }]} />
+              </View>
+              <Text style={styles.nutritionProgressText}>{Math.round(dailySummary?.proteinProgress || 0)}%</Text>
+            </View>
+
+            <View style={styles.nutritionMacroCard}>
+              <Text style={styles.nutritionMacroLabel}>Fats</Text>
+              <Text style={styles.nutritionMacroValue}>{Math.round(dailySummary?.totalFats || 0)}g</Text>
+              <View style={styles.nutritionProgressBar}>
+                <View style={[styles.nutritionProgressFill, { width: `${dailySummary?.fatsProgress || 0}%`, backgroundColor: '#FF9800' }]} />
+              </View>
+              <Text style={styles.nutritionProgressText}>{Math.round(dailySummary?.fatsProgress || 0)}%</Text>
+            </View>
+          </View>
+
+          {/* Second Row - Carbs & Sugars */}
+          <View style={styles.nutritionMacroGrid}>
+            <View style={styles.nutritionMacroCard}>
+              <Text style={styles.nutritionMacroLabel}>Carbs</Text>
+              <Text style={styles.nutritionMacroValue}>{Math.round(dailySummary?.totalCarbs || 0)}g</Text>
+              <View style={styles.nutritionProgressBar}>
+                <View style={[styles.nutritionProgressFill, { width: `${dailySummary?.carbsProgress || 0}%`, backgroundColor: '#2196F3' }]} />
+              </View>
+              <Text style={styles.nutritionProgressText}>{Math.round(dailySummary?.carbsProgress || 0)}%</Text>
+            </View>
+
+            <View style={styles.nutritionMacroCard}>
+              <Text style={styles.nutritionMacroLabel}>Sugars</Text>
+              <Text style={styles.nutritionMacroValue}>{Math.round(dailySummary?.totalSugars || 0)}g</Text>
+              <View style={styles.nutritionProgressBar}>
+                <View style={[styles.nutritionProgressFill, { 
+                  width: `${dailySummary?.sugarsProgress || 0}%`, 
+                  backgroundColor: (dailySummary?.sugarsProgress || 0) > 75 ? '#F44336' : '#9C27B0' // Red if >75%, purple otherwise
+                }]} />
+              </View>
+              <Text style={styles.nutritionProgressText}>{Math.round(dailySummary?.sugarsProgress || 0)}%</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Nutrition Insights (moved from Log tab) */}
+        {nutritionInsights.length > 0 && showInsights && (
+          <View style={styles.insightsContainer}>
+            <View style={styles.insightsHeader}>
+              <Text style={styles.insightsTitle}>💡 Nutrition Insights</Text>
+              <TouchableOpacity onPress={() => setShowInsights(false)}>
+                <Text style={styles.dismissText}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {nutritionInsights.map((insight, index) => (
+              <View key={index} style={[styles.insightCard, 
+                insight.type === 'success' && styles.successCard,
+                insight.type === 'warning' && styles.warningCard,
+                insight.type === 'info' && styles.infoCard
+              ]}>
+                <Text style={styles.insightIcon}>{insight.icon}</Text>
+                <Text style={styles.insightMessage}>{insight.message}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Today's Logged Foods Section */}
+        <View style={styles.todaysLoggedSection}>
+          <Text style={styles.sectionTitle}>🍽️ Today's Logged Foods ({getTodaysLoggedFoods().length})</Text>
+          {(() => {
+            const todaysFoods = getTodaysLoggedFoods();
+            console.log("Track tab - All logged foods:", loggedFoods);
+            console.log("Track tab - Today's foods:", todaysFoods);
+            console.log("Track tab - Today's date:", new Date().toISOString().split('T')[0]);
+            
+            if (todaysFoods.length === 0) {
+              return (
+                <View style={styles.emptyLoggedFoods}>
+                  <Text style={styles.emptyLoggedText}>No foods logged today yet</Text>
+                  <Text style={styles.emptyLoggedSubtext}>Go to the Log tab to add your meals!</Text>
+                </View>
+              );
+            }
+            
+            return todaysFoods.map(food => (
+              <View key={food.id} style={styles.loggedFoodItem}>
+                <View style={styles.loggedFoodHeader}>
+                  <Text style={styles.loggedFoodName}>{food.name}</Text>
+                  <Text style={styles.loggedFoodMeal}>{food.meal}</Text>
+                </View>
+                <View style={styles.loggedFoodNutrition}>
+                  <Text style={styles.loggedFoodCalories}>{food.calories} kcal</Text>
+                  <View style={styles.loggedFoodMacros}>
+                    <Text style={styles.loggedMacroText}>P: {food.protein}g</Text>
+                    <Text style={styles.loggedMacroText}>F: {food.fats}g</Text>
+                    <Text style={styles.loggedMacroText}>C: {food.carbs}g</Text>
+                    <Text style={styles.loggedMacroText}>S: {food.sugars || 0}g</Text>
+                  </View>
+                </View>
+                <Text style={styles.loggedFoodDate}>
+                  Updated: {formatLoggedDate(food.loggedDate)}
+                </Text>
+              </View>
+            ));
+          })()}
         </View>
 
         <View style={styles.header}>
@@ -988,6 +1490,90 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     borderRadius: 5,
   },
+  // New consistent calorie display styles
+  calorieDisplayContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 20,
+    marginTop: 10,
+  },
+  currentIntakeContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  intakeNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  intakeLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  intakeUnit: {
+    fontSize: 10,
+    color: '#999',
+  },
+  progressBadgeContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 5,
+    borderColor: '#FCB647',
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressPercentage: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  goalIntakeContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  goalNumber: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FF9800',
+  },
+  goalLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  goalUnit: {
+    fontSize: 10,
+    color: '#999',
+  },
+  // Body goal display styles
+  trackHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 8,
+  },
+  bodyGoalBadge: {
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  bodyGoalBadgeText: {
+    fontSize: 12,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
   
   // Exercise Section Styles
   exerciseSection: {
@@ -1026,5 +1612,244 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginLeft: 36,
+  },
+  
+  // Daily Nutrition Summary Styles (moved from Log tab)
+  dailyNutritionSummary: {
+    backgroundColor: "#fff",
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 20,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  nutritionSummaryTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  nutritionNote: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 16,
+    fontStyle: "italic",
+  },
+  nutritionMacroGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  nutritionMacroCard: {
+    width: "47%",
+    backgroundColor: "#F8F9FA",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  nutritionMacroLabel: {
+    fontSize: 11,
+    color: "#666",
+    marginBottom: 6,
+    fontWeight: "600",
+    textAlign: "center",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  nutritionMacroValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  nutritionProgressBar: {
+    height: 6,
+    backgroundColor: "#E0E0E0",
+    borderRadius: 3,
+    width: "100%",
+    marginBottom: 4,
+  },
+  nutritionProgressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  nutritionProgressText: {
+    fontSize: 10,
+    color: "#666",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  
+  // Nutrition Insights Styles (moved from Log tab)
+  insightsContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  insightsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  insightsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  dismissText: {
+    color: "#6B7280",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  insightCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  successCard: {
+    backgroundColor: "#F0F9FF",
+    borderLeftColor: "#10B981",
+  },
+  warningCard: {
+    backgroundColor: "#FFFBEB",
+    borderLeftColor: "#F59E0B",
+  },
+  infoCard: {
+    backgroundColor: "#F0F9FF",
+    borderLeftColor: "#3B82F6",
+  },
+  insightIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  insightMessage: {
+    fontSize: 14,
+    color: "#374151",
+    lineHeight: 20,
+    flex: 1,
+  },
+  
+  // Today's Logged Foods Styles
+  todaysLoggedSection: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  emptyLoggedFoods: {
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  emptyLoggedText: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 4,
+  },
+  emptyLoggedSubtext: {
+    fontSize: 14,
+    color: "#999",
+  },
+  loggedFoodItem: {
+    backgroundColor: "#F8F9FA",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#4CAF50",
+  },
+  loggedFoodHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  loggedFoodName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    flex: 1,
+  },
+  loggedFoodMeal: {
+    fontSize: 12,
+    backgroundColor: "#4CAF50",
+    color: "white",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    textAlign: "center",
+  },
+  loggedFoodNutrition: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  loggedFoodCalories: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
+  loggedFoodMacros: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  loggedMacroText: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "500",
+  },
+  loggedFoodDate: {
+    fontSize: 11,
+    color: "#999",
+    fontStyle: "italic",
+  },
+  micronutrientsSection: {
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  micronutrientsLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  micronutrientsText: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 18,
   },
 });

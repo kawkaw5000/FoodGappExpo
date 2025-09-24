@@ -5,6 +5,16 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LevelBadge from '../../components/LevelBadge';
+import { calculateBMI, getBMICategory, getCalorieRecommendations } from '../../utils/bmiCalculator';
+import Config from '../../constants/Config';
+
+// Helper function to convert integer gender to display string
+const getGenderDisplay = (gender: number | null | undefined): string => {
+  if (gender === 0) return 'Male';
+  if (gender === 1) return 'Female';
+  if (gender === 2) return 'Others';
+  return '-';
+};
 
 
 
@@ -21,13 +31,21 @@ export default function ProfilePage() {
         if (!storedUserId) throw new Error('User not logged in.');
 
         // Fetch profile
-        const profileRes = await fetch(`${process.env.EXPO_PUBLIC_API_URL || ''}/account/getProfile?userId=${encodeURIComponent(storedUserId)}`);
+        const profileRes = await fetch(`${Config.Account_API}/getProfile?userId=${encodeURIComponent(storedUserId)}`, {
+          credentials: "include"
+        });
         if (!profileRes.ok) throw new Error('Failed to fetch profile');
         const profileData = await profileRes.json();
-        setProfile(profileData);
+        console.log('Profile API Response:', profileData); // Debug log
+        
+        // Handle nested response structure (userInfo might be nested)
+        const userInfo = profileData.userInfo || profileData;
+        setProfile(userInfo);
 
         // Fetch user level
-        const levelRes = await fetch(`${process.env.EXPO_PUBLIC_API_URL || ''}/account/user-level/${storedUserId}`);
+        const levelRes = await fetch(`${Config.Account_API}/user-level/${storedUserId}`, {
+          credentials: "include"
+        });
         if (!levelRes.ok) throw new Error('Failed to fetch user level');
         const levelData = await levelRes.json();
         setUserLevel(levelData);
@@ -95,10 +113,62 @@ export default function ProfilePage() {
           {profile && (
             <View style={styles.infoPanel}>
               <Text style={styles.infoLabel}>Name: <Text style={styles.infoValue}>{profile.firstName} {profile.lastName}</Text></Text>
-              <Text style={styles.infoLabel}>Email: <Text style={styles.infoValue}>{profile.email}</Text></Text>
+              <Text style={styles.infoLabel}>Gender: <Text style={styles.infoValue}>{getGenderDisplay(profile.gender)}</Text></Text>
               <Text style={styles.infoLabel}>Age: <Text style={styles.infoValue}>{profile.age ? `${profile.age} years` : '-'}</Text></Text>
               <Text style={styles.infoLabel}>Weight: <Text style={styles.infoValue}>{profile.weight ? `${profile.weight} kg` : '-'}</Text></Text>
               <Text style={styles.infoLabel}>Height: <Text style={styles.infoValue}>{profile.height ? `${profile.height} cm` : '-'}</Text></Text>
+              {(() => {
+                const bmi = calculateBMI(profile.weight, profile.height);
+                if (bmi === 0) return <Text style={styles.infoLabel}>BMI: <Text style={styles.infoValue}>-</Text></Text>;
+                
+                const bmiParams = {
+                  weight: profile.weight,
+                  height: profile.height,
+                  age: profile.age,
+                  gender: profile.gender != null ? profile.gender : 0, // Use integer gender: 0 = Male, 1 = Female, 2 = Others
+                  activityLevel: 'moderate' as const
+                };
+                
+                const bmiResult = getBMICategory(bmi, profile.gender, bmiParams);
+                const calorieRecs = profile.age ? getCalorieRecommendations(bmiParams, bmi) : null;
+                
+                return (
+                  <View style={styles.bmiSection}>
+                    <Text style={styles.infoLabel}>
+                      BMI: <Text style={[styles.infoValue, { color: bmiResult.categoryColor }]}>
+                        {bmiResult.bmi} ({bmiResult.category})
+                      </Text>
+                    </Text>
+                    
+                    {calorieRecs && (
+                      <View style={styles.calorieRecommendations}>
+                        <Text style={styles.calorieTitle}>Daily Calorie Goals:</Text>
+                        <Text style={styles.calorieGoal}>
+                          • Maintain: <Text style={styles.calorieValue}>{calorieRecs.goals.maintain.calories} cal</Text>
+                        </Text>
+                        <Text style={styles.calorieGoal}>
+                          • Lose Weight: <Text style={styles.calorieValue}>{calorieRecs.goals.loseWeight.calories} cal</Text>
+                        </Text>
+                        <Text style={styles.calorieGoal}>
+                          • Gain Weight: <Text style={styles.calorieValue}>{calorieRecs.goals.gainWeight.calories} cal</Text>
+                        </Text>
+                        <Text style={styles.bmiGuidance}>
+                          Recommended: {calorieRecs.bmiGuidance.focus}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    {bmiResult.recommendations && bmiResult.recommendations.length > 0 && (
+                      <View style={styles.recommendations}>
+                        <Text style={styles.recommendationTitle}>Health Recommendations:</Text>
+                        {bmiResult.recommendations.map((rec, index) => (
+                          <Text key={index} style={styles.recommendationText}>• {rec}</Text>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
               <Text style={styles.infoLabel}>Goal: <Text style={styles.infoValue}>{bodyGoalLabel(profile.bodyGoalId)}</Text></Text>
               <Text style={styles.infoLabel}>Joined: <Text style={styles.infoValue}>{profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</Text></Text>
             </View>
@@ -217,5 +287,57 @@ const styles = StyleSheet.create({
   infoValue: {
     fontWeight: 'normal',
     color: '#222',
+  },
+  bmiSection: {
+    marginVertical: 8,
+  },
+  calorieRecommendations: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  calorieTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 6,
+  },
+  calorieGoal: {
+    fontSize: 13,
+    color: '#555',
+    marginBottom: 3,
+  },
+  calorieValue: {
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  bmiGuidance: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  recommendations: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ffc107',
+  },
+  recommendationTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 6,
+  },
+  recommendationText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+    lineHeight: 16,
   },
 });

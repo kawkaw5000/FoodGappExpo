@@ -13,12 +13,13 @@ interface LoggedFood {
   protein: number;
   fats: number;
   carbs: number;
+  sugars: number; // Make sugar required since we're now using it
   meal: string;
   grams?: number;
+  loggedDate?: string; // Date when food was logged
   cholesterol?: number;
   sodium?: number;
   fiber?: number;
-  sugars?: number;
   vitaminD?: number;
   calcium?: number;
   iron?: number;
@@ -26,30 +27,10 @@ interface LoggedFood {
   vitaminA?: number;
   vitaminC?: number;
   nutrientLogId?: number;
+  micronutrients?: string; // Add micronutrients field
 }
 
-// Enhanced nutrition summary interface
-interface DailyNutritionSummary {
-  totalCalories: number;
-  totalProtein: number;
-  totalFats: number;
-  totalCarbs: number;
-  goalCalories: number;
-  goalProtein: number;
-  goalFats: number;
-  goalCarbs: number;
-  caloriesProgress: number;
-  proteinProgress: number;
-  fatsProgress: number;
-  carbsProgress: number;
-}
-
-// Nutrition insight for the log page
-interface NutritionInsight {
-  type: 'warning' | 'success' | 'info';
-  message: string;
-  icon: string;
-}
+// Food logging focused - nutrition tracking moved to Track tab
 
 export default function LogPage() {
   const router = useRouter();
@@ -59,10 +40,7 @@ export default function LogPage() {
   const [selectedFood, setSelectedFood] = useState<LoggedFood | null>(null);
   const [showNutritionModal, setShowNutritionModal] = useState(false);
   
-  // Enhanced nutrition tracking states
-  const [dailySummary, setDailySummary] = useState<DailyNutritionSummary | null>(null);
-  const [nutritionInsights, setNutritionInsights] = useState<NutritionInsight[]>([]);
-  const [showInsights, setShowInsights] = useState(true);
+  // Focused on food logging only - nutrition tracking moved to Track tab
 
   // Load user ID from storage
   useEffect(() => {
@@ -109,6 +87,14 @@ export default function LogPage() {
           .map((log: any) => {
             console.log("Processing log:", log);
             console.log("Nutrient data:", log.nutrientData);
+            console.log("Available date fields:", {
+              nutrientUpdatedAt: log.nutrientData?.updatedAt,
+              logUpdatedAt: log.updatedAt,
+              nutrientCreatedAt: log.nutrientData?.createdAt,
+              logCreatedAt: log.createdAt,
+              loggedDate: log.loggedDate,
+              dateLogged: log.dateLogged
+            });
             
             // Determine food name with multiple fallbacks:
             // 1) foodData from joined Food table: log.foodData?.FoodName
@@ -128,20 +114,23 @@ export default function LogPage() {
               calories: parseInt(log.nutrientData.calories) || 0, // lowercase 'c'
               protein: parseFloat(log.nutrientData.protein) || 0, // lowercase 'p'
               fats: parseFloat(log.nutrientData.fat) || 0, // 'fat' not 'fats'
-              carbs: parseFloat(log.nutrientData.carbs) || 0,
+              carbs: parseFloat(log.nutrientData.carbs || log.nutrientData.carbohydrates || log.nutrientData.total_carbohydrate) || 0,
               meal: log.mealType || 'Breakfast', // Use mealType from backend response
               grams: parseFloat(log.nutrientData.foodGramAmount) || 100, // camelCase
-              // Additional nutrition data for the modal - using exact database field names
-              cholesterol: 0, // Not in your current table structure
-              sodium: 0, // Not in your current table structure
-              fiber: 0, // Not in your current table structure
-              sugars: 0, // Not in your current table structure
-              vitaminD: 0, // Not in your current table structure
-              calcium: 0, // Not in your current table structure
-              iron: 0, // Not in your current table structure
-              potassium: 0, // Not in your current table structure
-              vitaminA: 0, // Not in your current table structure
-              vitaminC: 0, // Not in your current table structure
+              // Add logged date - prioritize updatedAt from NutrientLog table for accuracy
+              loggedDate: log.nutrientData?.updatedAt || log.updatedAt || log.nutrientData?.createdAt || log.createdAt || log.loggedDate || log.dateLogged || new Date().toISOString().split('T')[0],
+              // Additional nutrition data for the modal - extract from available data
+              cholesterol: parseFloat(log.nutrientData.cholesterol) || 0,
+              sodium: parseFloat(log.nutrientData.sodium) || 0,
+              fiber: parseFloat(log.nutrientData.fiber) || 0,
+              sugars: parseFloat(log.nutrientData.sugars || log.nutrientData.Sugar || log.nutrientData.sugar) || 0,
+              vitaminD: parseFloat(log.nutrientData.vitaminD) || 0,
+              calcium: parseFloat(log.nutrientData.calcium) || 0,
+              iron: parseFloat(log.nutrientData.iron) || 0,
+              potassium: parseFloat(log.nutrientData.potassium) || 0,
+              vitaminA: parseFloat(log.nutrientData.vitaminA) || 0,
+              vitaminC: parseFloat(log.nutrientData.vitaminC) || 0,
+              micronutrients: log.nutrientData.micronutrients || log.nutrientData.MicroNutrients || "",
               nutrientLogId: log.nutrientData.nutrientLogId // camelCase
             };
           });
@@ -160,104 +149,25 @@ export default function LogPage() {
     }
   };
 
-  // Calculate daily nutrition summary
-  const calculateDailySummary = (foods: LoggedFood[]): DailyNutritionSummary => {
-    const totals = foods.reduce((acc, food) => ({
-      totalCalories: acc.totalCalories + food.calories,
-      totalProtein: acc.totalProtein + food.protein,
-      totalFats: acc.totalFats + food.fats,
-      totalCarbs: acc.totalCarbs + food.carbs,
-    }), {
-      totalCalories: 0,
-      totalProtein: 0,
-      totalFats: 0,
-      totalCarbs: 0,
-    });
-
-    // Daily goals (can be made dynamic based on user profile)
-    const goals = {
-      goalCalories: 2000,
-      goalProtein: 150,
-      goalFats: 65,
-      goalCarbs: 250,
-    };
-
-    return {
-      ...totals,
-      ...goals,
-      caloriesProgress: Math.min((totals.totalCalories / goals.goalCalories) * 100, 100),
-      proteinProgress: Math.min((totals.totalProtein / goals.goalProtein) * 100, 100),
-      fatsProgress: Math.min((totals.totalFats / goals.goalFats) * 100, 100),
-      carbsProgress: Math.min((totals.totalCarbs / goals.goalCarbs) * 100, 100),
-    };
-  };
-
-  // Generate nutrition insights based on daily summary
-  const generateNutritionInsights = (summary: DailyNutritionSummary): NutritionInsight[] => {
-    const insights: NutritionInsight[] = [];
-
-    // Calorie insights
-    if (summary.caloriesProgress < 50) {
-      insights.push({
-        type: 'warning',
-        message: `You're at ${Math.round(summary.caloriesProgress)}% of your daily calorie goal. Consider adding a healthy snack!`,
-        icon: '⚠️'
-      });
-    } else if (summary.caloriesProgress > 100) {
-      insights.push({
-        type: 'info',
-        message: `You've exceeded your calorie goal by ${Math.round(summary.caloriesProgress - 100)}%. Try lighter options for your next meal.`,
-        icon: '📊'
-      });
-    } else if (summary.caloriesProgress >= 80) {
-      insights.push({
-        type: 'success',
-        message: `Great job! You're on track with ${Math.round(summary.caloriesProgress)}% of your calorie goal completed.`,
-        icon: '🎯'
-      });
-    }
-
-    // Protein insights
-    if (summary.proteinProgress < 60) {
-      insights.push({
-        type: 'warning',
-        message: `Your protein intake is at ${Math.round(summary.proteinProgress)}%. Add some eggs, fish, or beans to boost protein.`,
-        icon: '🥚'
-      });
-    } else if (summary.proteinProgress >= 90) {
-      insights.push({
-        type: 'success',
-        message: `Excellent protein intake! You've reached ${Math.round(summary.proteinProgress)}% of your goal.`,
-        icon: '💪'
-      });
-    }
-
-    // Balance insights
-    const isBalanced = summary.proteinProgress >= 70 && summary.fatsProgress >= 50 && summary.carbsProgress >= 50;
-    if (isBalanced && summary.caloriesProgress >= 80 && summary.caloriesProgress <= 110) {
-      insights.push({
-        type: 'success',
-        message: 'Your nutrition is well-balanced today! Keep up the great work.',
-        icon: '🌟'
-      });
-    }
-
-    return insights.slice(0, 2); // Limit to 2 insights
-  };
-
-  // Update summary and insights when foods change
-  useEffect(() => {
-    if (loggedFoods.length > 0) {
-      const summary = calculateDailySummary(loggedFoods);
-      setDailySummary(summary);
+  // Format date without time for cleaner display
+  const formatLoggedDate = (dateString: string | undefined): string => {
+    if (!dateString) return 'Date not available';
+    
+    try {
+      const date = new Date(dateString);
+      const isToday = date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
       
-      const insights = generateNutritionInsights(summary);
-      setNutritionInsights(insights);
-    } else {
-      setDailySummary(null);
-      setNutritionInsights([]);
+      if (isToday) {
+        return 'Today';
+      } else {
+        return date.toLocaleDateString();
+      }
+    } catch (error) {
+      return 'Invalid date';
     }
-  }, [loggedFoods]);
+  };
+
+  // Nutrition tracking moved to Track tab - Log tab focuses on food logging only
 
   // Refresh data when screen comes into focus (e.g., returning from scan page)
   useFocusEffect(
@@ -317,9 +227,7 @@ export default function LogPage() {
   };
 
 
-  const getTotalCalories = () => {
-    return loggedFoods.reduce((total, food) => total + food.calories, 0);
-  };
+
 
   const getFoodsForMeal = (mealName: string) => {
     return loggedFoods.filter(food => food.meal === mealName);
@@ -327,13 +235,11 @@ export default function LogPage() {
 
   const renderMealSection = (mealName: string) => {
     const mealFoods = getFoodsForMeal(mealName);
-    const mealCalories = mealFoods.reduce((total, food) => total + food.calories, 0);
 
     return (
       <View key={mealName} style={styles.mealSection}>
         <View style={styles.mealHeader}>
           <Text style={styles.mealTitle}>{mealName}</Text>
-          <Text style={styles.mealCalories}>{mealCalories} kcal</Text>
         </View>
 
         {mealFoods.map((food) => (
@@ -343,12 +249,12 @@ export default function LogPage() {
                 {food.name}
                 {!food.name || food.name.startsWith('Food Entry') ? ' (Name missing from backend)' : ''}
               </Text>
-              <Text style={styles.foodCalories}>{food.calories} kcal</Text>
             </View>
             <View style={styles.macros}>
               <Text style={styles.macroText}>P: {food.protein}g</Text>
               <Text style={styles.macroText}>F: {food.fats}g</Text>
               <Text style={styles.macroText}>C: {food.carbs}g</Text>
+              <Text style={styles.macroText}>S: {food.sugars || 0}g</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -369,72 +275,7 @@ export default function LogPage() {
         </View>
       ) : (
         <ScrollView>
-          <View style={styles.header}>
-            <View style={styles.progressCircle}>
-              <Text style={styles.progressText}>{getTotalCalories()} / 2000</Text>
-              <Text style={styles.progressSubText}>kcal</Text>
-            </View>
-          </View>
-
-          {/* Enhanced Nutrition Summary */}
-          {dailySummary && (
-            <View style={styles.nutritionSummary}>
-              <Text style={styles.summaryTitle}>📊 Logged Nutrition Summary</Text>
-              
-              <View style={styles.macroGrid}>
-                <View style={styles.macroCard}>
-                  <Text style={styles.macroLabel}>Protein</Text>
-                  <Text style={styles.macroValue}>{Math.round(dailySummary.totalProtein)}g</Text>
-                  <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${dailySummary.proteinProgress}%`, backgroundColor: '#4CAF50' }]} />
-                  </View>
-                  <Text style={styles.progressText}>{Math.round(dailySummary.proteinProgress)}%</Text>
-                </View>
-
-                <View style={styles.macroCard}>
-                  <Text style={styles.macroLabel}>Fats</Text>
-                  <Text style={styles.macroValue}>{Math.round(dailySummary.totalFats)}g</Text>
-                  <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${dailySummary.fatsProgress}%`, backgroundColor: '#FF9800' }]} />
-                  </View>
-                  <Text style={styles.progressText}>{Math.round(dailySummary.fatsProgress)}%</Text>
-                </View>
-
-                <View style={styles.macroCard}>
-                  <Text style={styles.macroLabel}>Carbs</Text>
-                  <Text style={styles.macroValue}>{Math.round(dailySummary.totalCarbs)}g</Text>
-                  <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${dailySummary.carbsProgress}%`, backgroundColor: '#2196F3' }]} />
-                  </View>
-                  <Text style={styles.progressText}>{Math.round(dailySummary.carbsProgress)}%</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Nutrition Insights */}
-          {nutritionInsights.length > 0 && showInsights && (
-            <View style={styles.insightsContainer}>
-              <View style={styles.insightsHeader}>
-                <Text style={styles.insightsTitle}>💡 Nutrition Insights</Text>
-                <TouchableOpacity onPress={() => setShowInsights(false)}>
-                  <Text style={styles.dismissText}>Dismiss</Text>
-                </TouchableOpacity>
-              </View>
-              
-              {nutritionInsights.map((insight, index) => (
-                <View key={index} style={[styles.insightCard, 
-                  insight.type === 'success' && styles.successCard,
-                  insight.type === 'warning' && styles.warningCard,
-                  insight.type === 'info' && styles.infoCard
-                ]}>
-                  <Text style={styles.insightIcon}>{insight.icon}</Text>
-                  <Text style={styles.insightMessage}>{insight.message}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
+          {/* Focused on food logging only - nutrition tracking moved to Track tab */}
           {["Breakfast", "Lunch", "Dinner", "Snacks"].map(renderMealSection)}
         </ScrollView>
       )}
@@ -473,10 +314,27 @@ export default function LogPage() {
                   <Text style={styles.macroLabel}>Carbs</Text>
                   <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{selectedFood?.carbs || 0}g</Text>
                 </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroLabel}>Sugar</Text>
+                  <Text style={[styles.macroValue, {color: '#9C27B0'}]}>{selectedFood?.sugars || 0}g</Text>
+                </View>
               </View>
+              
+              {(selectedFood as any)?.micronutrients && (
+                <View style={styles.micronutrientsSection}>
+                  <Text style={styles.micronutrientsLabel}>Micronutrients:</Text>
+                  <Text style={styles.micronutrientsText}>{(selectedFood as any).micronutrients}</Text>
+                </View>
+              )}
               
               <Text style={styles.nutritionFactsTitle}>Log Information</Text>
               <View style={styles.nutritionFacts}>
+                <View style={styles.nutrientRow}>
+                  <Text style={styles.nutrientName}>Last Updated</Text>
+                  <Text style={styles.nutrientValue}>
+                    {formatLoggedDate(selectedFood?.loggedDate)}
+                  </Text>
+                </View>
                 <View style={styles.nutrientRow}>
                   <Text style={styles.nutrientName}>Food Log ID</Text>
                   <Text style={styles.nutrientValue}>FoodLogId: {selectedFood?.id}</Text>
@@ -511,31 +369,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
-  header: {
-    alignItems: "center",
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  progressCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 10,
-    borderColor: "#4CAF50",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8F8F8",
-  },
-  progressText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  progressSubText: {
-    fontSize: 16,
-    color: "gray",
-  },
+
   mealSection: {
     marginHorizontal: 20,
     marginVertical: 15,
@@ -562,11 +396,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
   },
-  mealCalories: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#4CAF50",
-  },
+
   foodItem: {
     backgroundColor: "#f9f9f9",
     padding: 12,
@@ -586,21 +416,22 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#333",
   },
-  foodCalories: {
-    fontSize: 14,
-    color: "#666",
-  },
+
   macros: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 4,
   },
   macroText: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#666",
     backgroundColor: "#f0f0f0",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: 4,
+    minWidth: 35,
+    textAlign: "center",
   },
   addFoodButton: {
     backgroundColor: "#fff",
@@ -753,109 +584,22 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
-  nutritionSummary: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 16,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  micronutrientsSection: {
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
   },
-  macroGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  macroCard: {
-    flex: 1,
-    backgroundColor: "#F8F9FA",
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 4,
-    alignItems: "center",
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: "#E0E0E0",
-    borderRadius: 4,
-    marginTop: 8,
-    width: "100%",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  insightsContainer: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-  },
-  insightCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    borderLeftWidth: 4,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-  },
-  insightSuccess: {
-    borderLeftColor: "#4CAF50",
-  },
-  insightWarning: {
-    borderLeftColor: "#FF9800",
-  },
-  insightInfo: {
-    borderLeftColor: "#2196F3",
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  insightsHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  insightsTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  dismissText: {
-    color: "#6B7280",
+  micronutrientsLabel: {
     fontSize: 14,
-    fontWeight: "500",
-  },
-  successCard: {
-    backgroundColor: "#F0F9FF",
-    borderLeftColor: "#10B981",
-  },
-  warningCard: {
-    backgroundColor: "#FFFBEB",
-    borderLeftColor: "#F59E0B",
-  },
-  infoCard: {
-    backgroundColor: "#F0F9FF",
-    borderLeftColor: "#3B82F6",
-  },
-  insightIcon: {
-    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
     marginBottom: 8,
   },
-  insightMessage: {
-    fontSize: 14,
-    color: "#374151",
-    lineHeight: 20,
+  micronutrientsText: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 18,
   },
+  // Nutrition tracking styles removed - moved to Track tab
 });

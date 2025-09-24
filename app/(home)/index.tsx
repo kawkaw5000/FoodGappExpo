@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity, Modal, ScrollView } from "react-native";
+import { View, Text, StyleSheet, SafeAreaView, Image, TouchableOpacity, Modal, ScrollView, Alert } from "react-native";
 import CustomButton from "@/components/buttons/CustomButton";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -12,6 +12,16 @@ import UserExperienceService, { UserLevel } from "@/services/UserExperienceServi
 import { LevelBadge } from "@/components/LevelBadge";
 import { ShareData } from "@/services/SocialSharingService";
 import Config from "@/constants/Config";
+import { calculateBMI, getBMICategory, getCalorieRecommendations } from "@/utils/bmiCalculator";
+import DailyGoalTracker, { YesterdayGoalNotification } from "@/services/DailyGoalTracker";
+
+// Helper function to convert integer gender to display string
+const getGenderDisplay = (gender: number | undefined): string => {
+  if (gender === 0) return 'Male';
+  if (gender === 1) return 'Female';
+  if (gender === 2) return 'Others';
+  return 'Not specified';
+};
 
 // WellNū Study: Basic nutrition insights interface
 interface NutritionInsight {
@@ -37,7 +47,7 @@ interface DailyNutritionSummary {
 // WellNū Study: User profile for personalized recommendations
 interface UserProfile {
   age?: number;
-  gender?: string;
+  gender?: number; // 0 = Male, 1 = Female, 2 = Others
   weight?: number;
   height?: number;
   bodyGoal?: string;
@@ -100,12 +110,31 @@ export default function HomeScreen() {
   
   // WellNū Study: Meal suggestions state
   const [mealSuggestions, setMealSuggestions] = useState<MealSuggestion[]>([]);
+  
+  // Yesterday goal notification state
+  const [yesterdayGoalNotification, setYesterdayGoalNotification] = useState<YesterdayGoalNotification | null>(null);
+
+  // Check yesterday's goal notification
+  const checkYesterdayGoal = async () => {
+    try {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      if (storedUserId) {
+        const notification = await DailyGoalTracker.checkYesterdayGoalNotification(parseInt(storedUserId));
+        setYesterdayGoalNotification(notification);
+      }
+    } catch (error) {
+      console.error('Error checking yesterday goal:', error);
+    }
+  };
+
+
 
   // Load user data when screen focuses
   useFocusEffect(
     useCallback(() => {
       loadUserLevel();
       loadUserData();
+      checkYesterdayGoal();
     }, [])
   );
 
@@ -182,6 +211,15 @@ export default function HomeScreen() {
         
         const insights = generateSmartInsights(nutritionTotals);
         setNutritionInsights(insights);
+
+        // Update today's goal progress
+        if (userId) {
+          await DailyGoalTracker.updateTodayGoalProgress(
+            parseInt(userId),
+            nutritionTotals.calories,
+            nutritionTotals.goalCalories
+          );
+        }
       }
     } catch (error) {
       console.error('Error loading real nutrition data:', error);
@@ -212,9 +250,38 @@ export default function HomeScreen() {
       calcium: 0,
       iron: 0,
       vitaminC: 0,
-      goalCalories: 1925
+      goalCalories: getPersonalizedCalorieGoal()
     });
     return totals;
+  };
+
+  // Get personalized calorie goal based on user profile and body goal
+  const getPersonalizedCalorieGoal = (): number => {
+    if (userProfile && userProfile.weight && userProfile.height && userProfile.age && userProfile.gender !== undefined) {
+      const currentBMI = calculateBMI(userProfile.weight, userProfile.height);
+      const calorieRecs = getCalorieRecommendations({
+        weight: userProfile.weight,
+        height: userProfile.height,
+        age: userProfile.age,
+        gender: userProfile.gender,
+        activityLevel: 'moderate'
+      }, currentBMI);
+
+      // Map body goal to appropriate calorie target
+      switch (userProfile.bodyGoal) {
+        case 'Lose Weight':
+          return Math.round(calorieRecs.goals.loseWeight.calories);
+        case 'Gain Weight':
+          return Math.round(calorieRecs.goals.gainWeight.calories);
+        case 'Maintain Weight':
+          return Math.round(calorieRecs.goals.maintain.calories);
+        case 'Build Muscle':
+          return Math.round(calorieRecs.goals.gainWeight.calories); // Muscle building needs surplus
+        default:
+          return Math.round(calorieRecs.goals.maintain.calories);
+      }
+    }
+    return 1925; // Fallback if no profile data
   };
 
   // WellNū Study: Generate smart insights based on real nutrition data
@@ -286,7 +353,7 @@ export default function HomeScreen() {
           bmi = Math.round((userInfo.weight / (heightInMeters * heightInMeters)) * 10) / 10;
         }
 
-        // Map bodyGoalId to actual goal string
+        // Map bodyGoalId to actual goal string (CORRECTED MAPPING)
         const getBodyGoalText = (goalId: any): string => {
           switch (goalId) {
             case 1:
@@ -294,10 +361,10 @@ export default function HomeScreen() {
               return 'Lose Weight';
             case 2:
             case '2':
-              return 'Gain Weight';
+              return 'Maintain Weight';  // FIXED: Was incorrectly "Gain Weight"
             case 3:
             case '3':
-              return 'Maintain Weight';
+              return 'Gain Weight';      // FIXED: Was incorrectly "Maintain Weight"
             case 4:
             case '4':
               return 'Build Muscle';
@@ -539,9 +606,17 @@ export default function HomeScreen() {
               />
               <Text style={styles.userLevelText}>{userLevel.title}</Text>
               <Text style={styles.userLevelText}>{userName}</Text>
-              {userProfile?.bmi && (
-                <Text style={styles.bmiText}>BMI: {userProfile.bmi}</Text>
-              )}
+              {userProfile?.bmi && (() => {
+                const bmiResult = getBMICategory(userProfile.bmi, userProfile.gender);
+                return (
+                  <View style={styles.bmiContainer}>
+                    <Text style={styles.bmiText}>BMI: {userProfile.bmi}</Text>
+                    <Text style={[styles.bmiCategoryText, { color: bmiResult.categoryColor }]}>
+                      {bmiResult.category}
+                    </Text>
+                  </View>
+                );
+              })()}
             </View>
           )}
         </View>
@@ -555,40 +630,35 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Main Calorie Summary */}
-        <View style={styles.mainSummary}>
-          <View style={styles.calorieCircleContainer}>
-            <View style={styles.calorieCircle}>
-              <Text style={styles.calorieNumber}>{realCalorieData.consumed}</Text>
-              <Text style={styles.calorieLabel}>cal</Text>
+        {/* Yesterday Goal Notification */}
+        {yesterdayGoalNotification?.shouldShow && (
+          <View style={styles.yesterdayNotificationContainer}>
+            <View style={styles.yesterdayNotification}>
+              <View style={styles.notificationContent}>
+                <Ionicons name="warning-outline" size={24} color="#FF5722" />
+                <View style={styles.notificationText}>
+                  <Text style={styles.notificationTitle}>Goal Missed Yesterday</Text>
+                  <Text style={styles.notificationMessage}>
+                    You reached {yesterdayGoalNotification.completionPercentage}% of your calorie goal yesterday. 
+                    Let's get back on track today! 💪
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.notificationDismiss}
+                onPress={async () => {
+                  const userId = await AsyncStorage.getItem('userId');
+                  if (userId) {
+                    await DailyGoalTracker.markYesterdayNotificationShown(parseInt(userId));
+                    setYesterdayGoalNotification({ ...yesterdayGoalNotification, shouldShow: false });
+                  }
+                }}
+              >
+                <Ionicons name="close" size={20} color="#666" />
+              </TouchableOpacity>
             </View>
-            <View style={styles.goalContainer}>
-              <Text style={styles.goalNumber}>{realCalorieData.goal.toLocaleString()}</Text>
-              <Text style={styles.goalLabel}>kcal</Text>
-            </View>
-            <View style={styles.remainingContainer}>
-              <Text style={styles.remainingNumber}>{realCalorieData.remaining.toLocaleString()}</Text>
-              <Text style={styles.remainingLabel}>kcal</Text>
-            </View>
           </View>
-        </View>
-
-        {/* Macros Row */}
-        <View style={styles.macrosRow}>
-          <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{Math.round(dailyNutrition?.protein || 31)}g</Text>
-            <Text style={styles.macroLabel}>Protein</Text>
-          </View>
-          <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{Math.round(dailyNutrition?.fats || 27)}g</Text>
-            <Text style={styles.macroLabel}>Fats</Text>
-          </View>
-          <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{Math.round(dailyNutrition?.carbs || 2)}g</Text>
-            <Text style={styles.macroLabel}>Carbs</Text>
-          </View>
-        </View>
-
+        )}
         {/* Get Started Section - Always visible for user onboarding */}
         <View style={styles.getStartedSection}>
           <Text style={styles.getStartedTitle}>Ready to get personalized recommendations?</Text>
@@ -677,6 +747,60 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               )}
             </View>
+          </View>
+        )}
+
+        {/* Health Overview Section */}
+        {userProfile && userProfile.bmi && userProfile.age && (
+          <View style={styles.healthSection}>
+            <Text style={styles.sectionTitle}>📊 Health Overview</Text>
+            {(() => {
+              const bmiParams = {
+                weight: userProfile.weight || 0,
+                height: userProfile.height || 0,
+                age: userProfile.age || 0,
+                gender: userProfile.gender != null ? userProfile.gender : 0, // Use integer: 0 = Male, 1 = Female, 2 = Others
+                activityLevel: 'moderate' as const
+              };
+              
+              const bmiResult = getBMICategory(userProfile.bmi, userProfile.gender, bmiParams);
+              const calorieRecs = getCalorieRecommendations(bmiParams, userProfile.bmi);
+              
+              return (
+                <View style={styles.healthContent}>
+                  <View style={styles.bmiHealthDisplay}>
+                    <Text style={styles.healthBmiText}>
+                      BMI: {bmiResult.bmi} 
+                      <Text style={[styles.healthBmiCategory, { color: bmiResult.categoryColor }]}>
+                        {' '}({bmiResult.category})
+                      </Text>
+                    </Text>
+                    <Text style={styles.healthBmiDescription}>{bmiResult.description}</Text>
+                  </View>
+                  
+                  <View style={styles.calorieGoalsDisplay}>
+                    <Text style={styles.calorieGoalsTitle}>Daily Calorie Goals:</Text>
+                    <View style={styles.calorieGoalsRow}>
+                      <View style={styles.calorieGoalItem}>
+                        <Text style={styles.calorieGoalLabel}>Maintain</Text>
+                        <Text style={styles.calorieGoalValue}>{calorieRecs.goals.maintain.calories}</Text>
+                      </View>
+                      <View style={styles.calorieGoalItem}>
+                        <Text style={styles.calorieGoalLabel}>Lose</Text>
+                        <Text style={styles.calorieGoalValue}>{calorieRecs.goals.loseWeight.calories}</Text>
+                      </View>
+                      <View style={styles.calorieGoalItem}>
+                        <Text style={styles.calorieGoalLabel}>Gain</Text>
+                        <Text style={styles.calorieGoalValue}>{calorieRecs.goals.gainWeight.calories}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.primaryGoalText}>
+                      Recommended: {calorieRecs.bmiGuidance.focus}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
           </View>
         )}
 
@@ -807,10 +931,30 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
-  bmiText: {
+  bmiContainer: {
+    alignItems: 'flex-start',
     marginLeft: 8,
+  },
+  bmiText: {
     fontSize: 11,
     color: '#4CAF50',
+    fontWeight: '600',
+  },
+  bmiCategoryText: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  bodyGoalContainer: {
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  bodyGoalText: {
+    fontSize: 10,
+    color: '#2E7D32',
     fontWeight: '600',
   },
   scrollView: {
@@ -829,6 +973,90 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
   },
+  // New reorganized calorie display styles
+  calorieDisplayContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 20,
+  },
+  currentIntakeContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  intakeNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  intakeLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  intakeUnit: {
+    fontSize: 10,
+    color: '#999',
+  },
+  progressBadgeContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 6,
+    borderColor: '#FCB647',
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressPercentage: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  levelBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  levelText: {
+    fontSize: 10,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  levelOnlyContainer: {
+    backgroundColor: 'white',
+    margin: 15,
+    borderRadius: 15,
+    padding: 20,
+    alignItems: 'center',
+  },
+  goalIntakeContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  goalNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FF9800',
+  },
+  goalLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  goalUnit: {
+    fontSize: 10,
+    color: '#999',
+  },
+  // Legacy styles (keeping for compatibility)
   calorieCircleContainer: {
     position: 'relative',
     alignItems: 'center',
@@ -859,15 +1087,6 @@ const styles = StyleSheet.create({
     left: -40,
     top: 40,
     alignItems: 'center',
-  },
-  goalNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  goalLabel: {
-    fontSize: 12,
-    color: 'gray',
   },
   remainingContainer: {
     position: 'absolute',
@@ -1218,5 +1437,116 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginLeft: 4,
+  },
+  // Health Overview Section Styles
+  healthSection: {
+    backgroundColor: 'white',
+    margin: 15,
+    borderRadius: 15,
+    padding: 20,
+  },
+  healthContent: {
+    marginTop: 10,
+  },
+  bmiHealthDisplay: {
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  healthBmiText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  healthBmiCategory: {
+    fontWeight: 'bold',
+  },
+  healthBmiDescription: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  calorieGoalsDisplay: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 15,
+  },
+  calorieGoalsTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  calorieGoalsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 10,
+  },
+  calorieGoalItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  calorieGoalLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  calorieGoalValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  primaryGoalText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 5,
+  },
+  // Yesterday Goal Notification Styles
+  yesterdayNotificationContainer: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+  },
+  yesterdayNotification: {
+    backgroundColor: '#FFF3E0',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF5722',
+    borderRadius: 8,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  notificationContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  notificationText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  notificationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#D84315',
+    marginBottom: 4,
+  },
+  notificationMessage: {
+    fontSize: 14,
+    color: '#5D4037',
+    lineHeight: 20,
+  },
+  notificationDismiss: {
+    padding: 4,
+    marginLeft: 8,
   },
 });

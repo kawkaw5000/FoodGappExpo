@@ -11,8 +11,7 @@ export default function RegisterMainScreen() {
   const { width } = Dimensions.get("window");
   const [birthdate, setBirthdate] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState<boolean>(false);
-  const [gender, setGender] = useState<string | null>(null);
-  const [otherGender, setOtherGender] = useState<string>("");
+  const [gender, setGender] = useState<number | null>(null);
   const [weight, setWeight] = useState<string>("");
   const [height, setHeight] = useState<string>("");
 
@@ -115,17 +114,17 @@ export default function RegisterMainScreen() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 borderWidth: 1,
-                borderColor: gender === "Male" ? "black" : "gray",
+                borderColor: gender === 0 ? "black" : "gray",
                 borderRadius: 5,
                 paddingHorizontal: 15,
                 paddingVertical: 10,
                 flex: 1,
               }}
-              onPress={() => setGender("Male")}
+              onPress={() => setGender(0)}
             >
               <Text style={{ fontWeight: "bold" }}>Male</Text>
               <MaterialIcons
-                name={gender === "Male" ? "radio-button-checked" : "radio-button-unchecked"}
+                name={gender === 0 ? "radio-button-checked" : "radio-button-unchecked"}
                 size={24}
                 color="black"
               />
@@ -136,32 +135,42 @@ export default function RegisterMainScreen() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 borderWidth: 1,
-                borderColor: gender === "Female" ? "black" : "gray",
+                borderColor: gender === 1 ? "black" : "gray",
                 borderRadius: 5,
                 paddingHorizontal: 15,
                 paddingVertical: 10,
                 flex: 1,
               }}
-              onPress={() => setGender("Female")}
+              onPress={() => setGender(1)}
             >
               <Text style={{ fontWeight: "bold" }}>Female</Text>
               <MaterialIcons
-                name={gender === "Female" ? "radio-button-checked" : "radio-button-unchecked"}
+                name={gender === 1 ? "radio-button-checked" : "radio-button-unchecked"}
                 size={24}
                 color="black"
               />
             </TouchableOpacity>
-            <TextInput
-            style={{
-              height: 50,
-              borderColor: "black",
-              borderWidth: 1,
-              paddingHorizontal: 10,
-              borderRadius: 5,
-              width: width * 0.28,
-            }}
-            placeholder="Specify"             
-          />
+            <TouchableOpacity
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                borderWidth: 1,
+                borderColor: gender === 2 ? "black" : "gray",
+                borderRadius: 5,
+                paddingHorizontal: 15,
+                paddingVertical: 10,
+                flex: 1,
+              }}
+              onPress={() => setGender(2)}
+            >
+              <Text style={{ fontWeight: "bold" }}>Others</Text>
+              <MaterialIcons
+                name={gender === 2 ? "radio-button-checked" : "radio-button-unchecked"}
+                size={24}
+                color="black"
+              />
+            </TouchableOpacity>
           </View>      
         </View>
         <View style={{flexDirection: 'row', gap: 20, justifyContent: 'space-between'}}> 

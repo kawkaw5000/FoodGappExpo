@@ -59,6 +59,38 @@ export class WellNuAlertService {
   }
 
   /**
+   * Generate sugar intake alert specifically
+   */
+  public async generateSugarAlert(sugarIntake: number): Promise<NutrientAlert | null> {
+    if (sugarIntake <= 50) return null; // WHO recommendation: <50g/day
+    
+    return {
+      id: `excess_sugar_${Date.now()}`,
+      type: 'excess',
+      priority: sugarIntake > 75 ? 'high' : 'medium',
+      title: 'High Sugar Intake Alert',
+      message: `Your sugar intake is ${Math.round(sugarIntake)}g today. Try to keep it under 50g.`,
+      nutrient: 'sugar',
+      currentValue: sugarIntake,
+      targetValue: 50,
+      recommendations: [
+        'Choose water over sweetened drinks',
+        'Limit desserts and sweet snacks',
+        'Read food labels for hidden sugars'
+      ],
+      filipinoFoodSuggestions: [
+        'Fresh fruits instead of fruit juices',
+        'Unsweetened coffee or tea',
+        'Natural sweeteners like honey (in moderation)'
+      ],
+      timestamp: new Date(),
+      isRead: false,
+      actionable: true,
+      cultural_context: 'Filipino cuisine often includes sweet elements. Balance with plenty of vegetables and protein.'
+    };
+  }
+
+  /**
    * Analyze daily nutrition and generate real-time alerts
    */
   public async generateRealTimeAlerts(
