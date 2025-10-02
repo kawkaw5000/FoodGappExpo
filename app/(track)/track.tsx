@@ -432,18 +432,28 @@ export default function TrackPage() {
       setMealPlanLoading(true);
       setMealPlanError(null);
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        
         const res = await fetch(require('../../constants/Config').default.API_BASE + '/generate_meal_plan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_profile: userProfile,
             duration_days: 7
-          })
+          }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeout);
         const data = await res.json();
         setMealPlan(data.meal_plan || "No meal plan available.");
-      } catch (e) {
-        setMealPlanError("Failed to fetch meal plan.");
+      } catch (e: any) {
+        if (e.name === 'AbortError') {
+          setMealPlanError("Request timed out (30s). Is the Python server running?");
+        } else {
+          setMealPlanError("Failed to fetch meal plan.");
+        }
       } finally {
         setMealPlanLoading(false);
       }

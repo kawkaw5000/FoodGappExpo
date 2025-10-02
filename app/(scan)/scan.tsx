@@ -79,11 +79,17 @@ export default function ScanPage() {
         type: "image/jpeg",
       } as any);
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      
       const res = await fetch(Config.DESCRIBE_IMAGE_API, {
         method: "POST",
         body: form,
         headers: { "Content-Type": "multipart/form-data" },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeout);
       const data = await res.json();
       if (res.ok && data.description) {
         const name = data.description.split(":").pop()?.trim() || "";
@@ -94,8 +100,12 @@ export default function ScanPage() {
       } else {
         Alert.alert("Detection Failed", "Could not detect food. Please enter manually.");
       }
-    } catch (e) {
-      Alert.alert("Error", "Failed to scan food.");
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        Alert.alert("Timeout", "Request timed out (30s). Is the Python server running?");
+      } else {
+        Alert.alert("Error", "Failed to scan food.");
+      }
     } finally {
       setLoading(false);
     }
@@ -120,11 +130,18 @@ export default function ScanPage() {
         body_goal: "maintain weight",
         date: new Date().toISOString()
       };
+      
+      const nutritionController = new AbortController();
+      const nutritionTimeout = setTimeout(() => nutritionController.abort(), 30000);
+      
       const nutritionRes = await fetch(Config.NUTRITION_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(nutritionPayload),
+        signal: nutritionController.signal
       });
+      
+      clearTimeout(nutritionTimeout);
 
       const nutritionRawText = await nutritionRes.text();
       if (nutritionRes.ok) {
@@ -157,8 +174,12 @@ export default function ScanPage() {
       } else {
         Alert.alert("Error", "Failed to get nutritional information.");
       }
-    } catch (e) {
-      Alert.alert("Error", "Failed to get nutritional information.");
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        Alert.alert("Timeout", "Request timed out (30s). Is the Python server running?");
+      } else {
+        Alert.alert("Error", "Failed to get nutritional information.");
+      }
     } finally {
       if (!loadingNutrition) setLoadingNutrition(false);
     }
@@ -189,6 +210,7 @@ export default function ScanPage() {
         Fat: fmt2(nutritionData?.fats).toString(),
         Carbs: fmt2(nutritionData?.carbs).toString(),
         Sugar: fmt2(nutritionData?.sugar).toString(),
+        MicroNutrients: nutritionData?.micronutrients || "", // Add micronutrients to the payload
       };
 
       console.log("Logging payload (/log):", logPayload);
@@ -283,10 +305,16 @@ export default function ScanPage() {
   const handleNutritionFetch = async () => {
     setLoadingNutrition(true);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      
       const res = await fetch(Config.NUTRITION_API + `?food=${encodeURIComponent(foodName)}&grams=${grams}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeout);
       const data = await res.json();
       if (res.ok) {
         setNutritionData(data);
@@ -294,9 +322,13 @@ export default function ScanPage() {
       } else {
         Alert.alert("Error", "Failed to fetch nutrition data.");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error fetching nutrition data:", e);
-      Alert.alert("Error", "Failed to fetch nutrition data.");
+      if (e.name === 'AbortError') {
+        Alert.alert("Timeout", "Request timed out (30s). Is the Python server running?");
+      } else {
+        Alert.alert("Error", "Failed to fetch nutrition data.");
+      }
     } finally {
       setLoadingNutrition(false);
     }
@@ -506,12 +538,14 @@ export default function ScanPage() {
                         ).toString()}g</Text>
                       </View>
                     </View>
-                    {nutritionData.micronutrients && (
-                      <View style={styles.micronutrientsSection}>
-                        <Text style={styles.micronutrientsLabel}>Micronutrients:</Text>
+                    <View style={styles.micronutrientsSection}>
+                      <Text style={styles.micronutrientsLabel}>Micronutrients:</Text>
+                      {nutritionData.micronutrients && nutritionData.micronutrients.trim() ? (
                         <Text style={styles.micronutrientsText}>{nutritionData.micronutrients}</Text>
-                      </View>
-                    )}
+                      ) : (
+                        <Text style={styles.micronutrientsPlaceholder}>No micronutrient data available for this food</Text>
+                      )}
+                    </View>
                   </>
                 ) : (
                   <Text style={styles.errorText}>No nutrition data available</Text>
@@ -787,5 +821,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     lineHeight: 18,
+  },
+  micronutrientsPlaceholder: {
+    fontSize: 12,
+    color: '#999',
+    lineHeight: 18,
+    fontStyle: 'italic',
+    opacity: 0.7,
   },
 });

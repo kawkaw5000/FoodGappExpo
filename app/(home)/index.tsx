@@ -8,6 +8,7 @@ import ChatbotScreen from "@/components/ChatbotScreen";
 import ShareModal from "@/components/ShareModal";
 import ExerciseSuggestions from "@/components/ExerciseSuggestions";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { WellNuAlertService } from "@/services/WellNuAlertService";
 import UserExperienceService, { UserLevel } from "@/services/UserExperienceService";
 import { LevelBadge } from "@/components/LevelBadge";
 import { ShareData } from "@/services/SocialSharingService";
@@ -127,7 +128,75 @@ export default function HomeScreen() {
     }
   };
 
+  // Check yesterday's calorie intake and show alert if low (with daily reset)
+  const checkYesterdayCalorieIntake = async () => {
+    try {
+      // Check for daily reset first
+      const alertService = WellNuAlertService.getInstance();
+      await alertService.checkAndResetDailyTracking();
+      
+      // Check if we already showed yesterday's alert today
+      const today = new Date().toDateString();
+      const lastYesterdayAlertDate = await AsyncStorage.getItem('last_yesterday_alert_date');
+      if (lastYesterdayAlertDate === today) {
+        return; // Already showed yesterday's alert today
+      }
+      
+      const storedUserId = await AsyncStorage.getItem('userId');
+      if (!storedUserId) return;
 
+      // Get yesterday's date
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayDateString = yesterday.toISOString().split('T')[0];
+
+      // Get yesterday's food logs
+      const response = await fetch(`${Config.API_BASE}/api/foodlogging/getUserLogs?userId=${storedUserId}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Calculate yesterday's total calories
+        let yesterdayCalories = 0;
+        if (data.logs) {
+          data.logs.forEach((log: any) => {
+            const dateValue = log.createdAt || log.updatedAt || log.loggedDate;
+            if (dateValue) {
+              const logDateObj = new Date(dateValue);
+              if (!isNaN(logDateObj.getTime())) {
+                const logDate = logDateObj.toISOString().split('T')[0];
+                if (logDate === yesterdayDateString) {
+                  const calories = parseInt(log.nutrientData?.calories) || 0;
+                  yesterdayCalories += calories;
+                }
+              }
+            }
+          });
+        }
+
+        // Show alert if yesterday's intake was low (< 1200 calories)
+        if (yesterdayCalories < 1200 && yesterdayCalories > 0) {
+          // Save tracking that we showed yesterday's alert today
+          const today = new Date().toDateString();
+          await AsyncStorage.setItem('last_yesterday_alert_date', today);
+          
+          setTimeout(() => {
+            Alert.alert(
+              '⚠️ Low Calorie Intake Yesterday',
+              `You only consumed ${yesterdayCalories} calories yesterday. Consider eating more nutritious meals today to meet your daily goals!\n\nRecommended: Aim for at least 1,200-1,500 calories per day.`,
+              [{ text: 'Got it!', style: 'default' }]
+            );
+          }, 2000); // Delay to avoid conflicts with other alerts
+        }
+      }
+    } catch (error) {
+      console.error('Error checking yesterday calorie intake:', error);
+    }
+  };
 
   // Load user data when screen focuses
   useFocusEffect(
@@ -135,6 +204,7 @@ export default function HomeScreen() {
       loadUserLevel();
       loadUserData();
       checkYesterdayGoal();
+      checkYesterdayCalorieIntake();
     }, [])
   );
 

@@ -4,6 +4,7 @@ import { StatusBar, View, Image, TouchableOpacity, Dimensions, StyleSheet, Text 
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NavImg } from "@/constants/NavImg";
 import BottomNavBar from "@/components/NavigationBar";
+import { WellNuAlertService } from "@/services/WellNuAlertService";
 
 export default function RootLayout() {
   const pathname = usePathname(); 
@@ -19,7 +20,21 @@ export default function RootLayout() {
     console.log(hideBottomNav)
     console.log(pathname)
     console.log('Segments:', segments)
-  })
+    
+    // Initialize daily reset system when app starts
+    const initializeDailyReset = async () => {
+      try {
+        const alertService = WellNuAlertService.getInstance();
+        await alertService.checkAndResetDailyTracking(); // Check if reset is needed now
+        alertService.scheduleDailyReset(); // Schedule automatic resets
+        console.log('✅ Daily reset system initialized');
+      } catch (error) {
+        console.error('❌ Error initializing daily reset system:', error);
+      }
+    };
+    
+    initializeDailyReset();
+  }, [])
   const router = useRouter();
   
   // Use segments to determine current route more accurately

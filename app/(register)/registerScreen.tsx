@@ -1,7 +1,7 @@
 import { View, Text, Button, Image, TextInput, TouchableOpacity, Alert, Dimensions, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CustomButton from "@/components/buttons/CustomButton";
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import axios, { AxiosError, AxiosResponse } from "axios";
@@ -24,8 +24,30 @@ export default function RegisterScreen() {
   const [age, setAge] = useState("");
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
+  const [gender, setGender] = useState<number | null>(null);
   const [bodyGoalId, setBodyGoalId] = useState<number>(1);
   const { width } = Dimensions.get("window");
+
+  // Load profile data from previous screen
+  useEffect(() => {
+    const loadProfileData = async () => {
+      try {
+        const profileDataString = await AsyncStorage.getItem('registrationProfileData');
+        if (profileDataString) {
+          const profileData = JSON.parse(profileDataString);
+          setFirstName(profileData.firstName || "");
+          setLastName(profileData.lastName || "");
+          setAge(profileData.age ? profileData.age.toString() : "");
+          setWeight(profileData.weight ? profileData.weight.toString() : "");
+          setHeight(profileData.height ? profileData.height.toString() : "");
+          setGender(profileData.gender);
+        }
+      } catch (error) {
+        console.error('Error loading profile data:', error);
+      }
+    };
+    loadProfileData();
+  }, []);
 
   const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
@@ -57,14 +79,23 @@ export default function RegisterScreen() {
             age: age ? Number(age) : null,
             weight: weight ? Number(weight) : null,
             height: height ? Number(height) : null,
+            gender: gender,
             bodyGoalId: bodyGoalId || null,
             firstName: firstName || null,
             lastName: lastName || null
           };
           await axios.post(`${Account_API}/createUserInfo`, userInfoPayload, { withCredentials: true });
         } catch (userInfoErr) {
-          // Optionally handle error
+          console.error('Error creating user info:', userInfoErr);
         }
+        
+        // Clean up stored profile data
+        try {
+          await AsyncStorage.removeItem('registrationProfileData');
+        } catch (error) {
+          console.error('Error cleaning up profile data:', error);
+        }
+        
         Alert.alert("Success", "Registration successful!", [
           { text: "OK", onPress: () => router.replace("/(login)/loginScreen") }
         ]);

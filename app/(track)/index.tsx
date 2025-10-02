@@ -6,6 +6,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
 import ExerciseSuggestions from '../../components/ExerciseSuggestions';
 import { calculateBMI, getCalorieRecommendations } from '../../utils/bmiCalculator';
+import { WellNuAlertService } from '../../services/WellNuAlertService';
 
 // User profile interface matching Home page
 interface UserProfile {
@@ -353,7 +354,7 @@ export default function TrackPage() {
   };
 
   // Generate nutrition insights based on daily summary
-  const generateNutritionInsights = (summary: DailyNutritionSummary): NutritionInsight[] => {
+  const generateNutritionInsights = async (summary: DailyNutritionSummary): Promise<NutritionInsight[]> => {
     const insights: NutritionInsight[] = [];
 
     // Calorie insights
@@ -392,26 +393,49 @@ export default function TrackPage() {
       });
     }
 
-    // Sugar insights (WHO guidelines: <50g/day)
-    if (summary.sugarsProgress > 100) {
-      insights.push({
-        type: 'warning',
-        message: `⚠️ High sugar intake! You've consumed ${Math.round(summary.totalSugars)}g (${Math.round(summary.sugarsProgress)}%). WHO recommends <50g/day.`,
-        icon: '🍭'
-      });
-    } else if (summary.sugarsProgress > 75) {
-      insights.push({
-        type: 'info',
-        message: `You're at ${Math.round(summary.sugarsProgress)}% of the recommended sugar limit. Watch your sweet intake!`,
-        icon: '🚨'
-      });
-    } else if (summary.sugarsProgress < 25) {
-      insights.push({
-        type: 'success',
-        message: `Good job keeping sugar low! You're at ${Math.round(summary.sugarsProgress)}% of the daily limit.`,
-        icon: '✅'
-      });
-    }
+    // Sugar insights with WellNu Alert Service integration (WHO guidelines: <50g/day)
+    const checkSugarAlerts = async () => {
+      try {
+        const alertService = WellNuAlertService.getInstance();
+        const sugarAlert = await alertService.generateSugarAlert(summary.totalSugars);
+        
+        if (sugarAlert && sugarAlert.priority === 'high') {
+          // Critical sugar alert
+          insights.push({
+            type: 'warning',
+            message: `🚨 CRITICAL: ${Math.round(summary.totalSugars)}g sugar consumed! WHO limit is 50g/day.`,
+            icon: '🚨'
+          });
+        } else if (summary.sugarsProgress > 75) {
+          // Warning level (75-100%)
+          insights.push({
+            type: 'info',
+            message: `⚠️ You're at ${Math.round(summary.sugarsProgress)}% of your daily sugar limit. Watch your sweet intake!`,
+            icon: '🍭'
+          });
+        } else if (summary.sugarsProgress < 25) {
+          // Good level (<25%)
+          insights.push({
+            type: 'success',
+            message: `✅ Excellent! You're keeping sugar low at ${Math.round(summary.sugarsProgress)}% of daily limit.`,
+            icon: '✅'
+          });
+        }
+      } catch (error) {
+        console.error('Error checking sugar alerts:', error);
+        // Fallback to simple insights
+        if (summary.sugarsProgress > 100) {
+          insights.push({
+            type: 'warning',
+            message: `⚠️ High sugar intake! You've consumed ${Math.round(summary.totalSugars)}g (${Math.round(summary.sugarsProgress)}%). WHO recommends <50g/day.`,
+            icon: '🍭'
+          });
+        }
+      }
+    };
+    
+    // Execute sugar alert check
+    await checkSugarAlerts();
 
     // Balance insights
     const isBalanced = summary.proteinProgress >= 70 && summary.fatsProgress >= 50 && summary.carbsProgress >= 50 && summary.sugarsProgress <= 75;
@@ -467,6 +491,15 @@ export default function TrackPage() {
               || log.nutrientData?.food?.FoodName
               || `Food Entry ${log.foodId}`;
             
+            // Debug sugar extraction
+            const extractedSugar = parseFloat(log.nutrientData.sugars || log.nutrientData.Sugar || log.nutrientData.sugar) || 0;
+            console.log("Track tab - Sugar extraction:", {
+              sugars: log.nutrientData.sugars,
+              Sugar: log.nutrientData.Sugar,
+              sugar: log.nutrientData.sugar,
+              extractedSugar: extractedSugar
+            });
+
             return {
               id: log.foodLogId.toString(),
               foodId: log.foodId,
@@ -476,22 +509,23 @@ export default function TrackPage() {
               calories: parseInt(log.nutrientData.calories) || 0,
               protein: parseFloat(log.nutrientData.protein) || 0,
               fats: parseFloat(log.nutrientData.fat) || 0, // 'fat' not 'fats'
-              carbs: parseFloat(log.nutrientData.carbs) || 0,
+              carbs: parseFloat(log.nutrientData.carbs || log.nutrientData.carbohydrates || log.nutrientData.total_carbohydrate) || 0,
               meal: log.mealType || 'Breakfast',
               grams: parseFloat(log.nutrientData.foodGramAmount) || 100,
               // Add logged date - prioritize updatedAt from NutrientLog table for accuracy
               loggedDate: log.nutrientData?.updatedAt || log.updatedAt || log.nutrientData?.createdAt || log.createdAt || log.loggedDate || log.dateLogged || new Date().toISOString().split('T')[0],
-              // Additional nutrition data
-              cholesterol: 0,
-              sodium: 0,
-              fiber: 0,
-              sugars: 0,
-              vitaminD: 0,
-              calcium: 0,
-              iron: 0,
-              potassium: 0,
-              vitaminA: 0,
-              vitaminC: 0,
+              // Additional nutrition data - extract real values from backend
+              cholesterol: parseFloat(log.nutrientData.cholesterol) || 0,
+              sodium: parseFloat(log.nutrientData.sodium) || 0,
+              fiber: parseFloat(log.nutrientData.fiber) || 0,
+              sugars: extractedSugar, // Use extracted sugar value
+              vitaminD: parseFloat(log.nutrientData.vitaminD) || 0,
+              calcium: parseFloat(log.nutrientData.calcium) || 0,
+              iron: parseFloat(log.nutrientData.iron) || 0,
+              potassium: parseFloat(log.nutrientData.potassium) || 0,
+              vitaminA: parseFloat(log.nutrientData.vitaminA) || 0,
+              vitaminC: parseFloat(log.nutrientData.vitaminC) || 0,
+              micronutrients: log.nutrientData.micronutrients || log.nutrientData.MicroNutrients || "",
               nutrientLogId: log.nutrientData.nutrientLogId,
             };
           });
@@ -522,7 +556,14 @@ export default function TrackPage() {
             
             const summary = calculateDailySummary(todaysFoods);
             setDailySummary(summary);
-            setNutritionInsights(generateNutritionInsights(summary));
+            
+            // Generate insights with sugar alerts (async)
+            generateNutritionInsights(summary).then(insights => {
+              setNutritionInsights(insights);
+            }).catch(error => {
+              console.error('Error generating nutrition insights:', error);
+              setNutritionInsights([]);
+            });
           } else {
             setDailySummary(null);
             setNutritionInsights([]);
@@ -580,7 +621,7 @@ export default function TrackPage() {
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
+      const timeout = setTimeout(() => controller.abort(), 30000);
       let response: Response;
       try {
         response = await fetch(url, {
@@ -590,7 +631,7 @@ export default function TrackPage() {
             signal: controller.signal
         });
       } catch (e: any) {
-        if (e.name === 'AbortError') throw new Error('Request timed out (10s). Is the Python server running?');
+        if (e.name === 'AbortError') throw new Error('Request timed out (30s). Is the Python server running?');
         throw e;
       } finally {
         clearTimeout(timeout);

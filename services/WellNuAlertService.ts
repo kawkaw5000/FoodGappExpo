@@ -59,35 +59,159 @@ export class WellNuAlertService {
   }
 
   /**
-   * Generate sugar intake alert specifically
+   * Check if it's a new day and reset daily notification tracking
+   */
+  public async checkAndResetDailyTracking(): Promise<void> {
+    try {
+      const today = new Date().toDateString();
+      const lastResetDate = await AsyncStorage.getItem('wellnu_last_reset_date');
+      
+      if (lastResetDate !== today) {
+        console.log('🔄 Daily reset: Clearing notification tracking for new day');
+        
+        // Reset daily notification tracking
+        await this.resetDailyNotifications();
+        
+        // Update last reset date
+        await AsyncStorage.setItem('wellnu_last_reset_date', today);
+        
+        console.log('✅ Daily reset completed successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error during daily reset:', error);
+    }
+  }
+
+  /**
+   * Reset daily notification tracking at midnight
+   */
+  private async resetDailyNotifications(): Promise<void> {
+    try {
+      // Reset sugar alert tracking
+      await AsyncStorage.removeItem('sugar_alert_shown_today');
+      await AsyncStorage.removeItem('last_sugar_alert_level');
+      
+      // Reset calorie alert tracking
+      await AsyncStorage.removeItem('calorie_alert_shown_today');
+      await AsyncStorage.removeItem('yesterday_calorie_alert_shown');
+      
+      // Reset hydration tracking
+      await AsyncStorage.removeItem('daily_hydration');
+      await AsyncStorage.removeItem('hydration_reminder_count');
+      
+      // Reset meal timing alerts
+      await AsyncStorage.removeItem('meal_timing_alerts_today');
+      
+      // Mark old alerts as reset (but keep them for history)
+      const alertsJson = await AsyncStorage.getItem('wellnu_alerts');
+      if (alertsJson) {
+        const alerts: NutrientAlert[] = JSON.parse(alertsJson);
+        const updatedAlerts = alerts.map(alert => ({
+          ...alert,
+          isRead: true // Mark previous day's alerts as read
+        }));
+        await AsyncStorage.setItem('wellnu_alerts', JSON.stringify(updatedAlerts));
+      }
+      
+      console.log('🔄 Daily notifications reset completed');
+    } catch (error) {
+      console.error('❌ Error resetting daily notifications:', error);
+    }
+  }
+
+  /**
+   * Schedule automatic daily reset at midnight
+   */
+  public scheduleDailyReset(): void {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0); // Set to midnight
+    
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+    
+    console.log(`⏰ Scheduling daily reset in ${Math.round(msUntilMidnight / 1000 / 60)} minutes`);
+    
+    setTimeout(() => {
+      this.checkAndResetDailyTracking();
+      // Schedule the next reset (24 hours from now)
+      this.scheduleDailyReset();
+    }, msUntilMidnight);
+  }
+
+  /**
+   * Generate sugar intake alert specifically with daily reset logic
    */
   public async generateSugarAlert(sugarIntake: number): Promise<NutrientAlert | null> {
-    if (sugarIntake <= 50) return null; // WHO recommendation: <50g/day
+    // Check for daily reset first
+    await this.checkAndResetDailyTracking();
     
-    return {
-      id: `excess_sugar_${Date.now()}`,
-      type: 'excess',
-      priority: sugarIntake > 75 ? 'high' : 'medium',
-      title: 'High Sugar Intake Alert',
-      message: `Your sugar intake is ${Math.round(sugarIntake)}g today. Try to keep it under 50g.`,
-      nutrient: 'sugar',
-      currentValue: sugarIntake,
-      targetValue: 50,
-      recommendations: [
-        'Choose water over sweetened drinks',
-        'Limit desserts and sweet snacks',
-        'Read food labels for hidden sugars'
-      ],
-      filipinoFoodSuggestions: [
-        'Fresh fruits instead of fruit juices',
-        'Unsweetened coffee or tea',
-        'Natural sweeteners like honey (in moderation)'
-      ],
-      timestamp: new Date(),
-      isRead: false,
-      actionable: true,
-      cultural_context: 'Filipino cuisine often includes sweet elements. Balance with plenty of vegetables and protein.'
-    };
+    if (sugarIntake <= 37.5) return null; // No alert below 75% of WHO limit
+    
+    try {
+      const today = new Date().toDateString();
+      const lastAlertDate = await AsyncStorage.getItem('sugar_alert_date');
+      const lastAlertLevel = await AsyncStorage.getItem('last_sugar_alert_level');
+      
+      let alertLevel: 'warning' | 'high' = sugarIntake >= 50 ? 'high' : 'warning';
+      
+      // Don't repeat same level alert on same day
+      if (lastAlertDate === today && lastAlertLevel === alertLevel) {
+        return null;
+      }
+      
+      // Create alert based on level
+      const alert: NutrientAlert = {
+        id: `excess_sugar_${Date.now()}`,
+        type: 'excess',
+        priority: alertLevel === 'high' ? 'high' : 'medium',
+        title: alertLevel === 'high' ? '🚨 Critical Sugar Alert' : '⚠️ Sugar Intake Warning',
+        message: alertLevel === 'high' 
+          ? `CRITICAL: Your sugar intake is ${Math.round(sugarIntake)}g today! WHO recommends <50g/day.`
+          : `WARNING: You're at ${Math.round(sugarIntake)}g sugar (${Math.round((sugarIntake/50)*100)}% of daily limit).`,
+        nutrient: 'sugar',
+        currentValue: sugarIntake,
+        targetValue: 50,
+        recommendations: alertLevel === 'high' 
+          ? [
+              'STOP consuming sweet foods immediately',
+              'Drink plenty of water to help process sugar',
+              'Take a walk to help metabolize excess sugar',
+              'Focus on protein and vegetables for remaining meals'
+            ]
+          : [
+              'Limit sweet drinks and desserts for the rest of the day',
+              'Choose fresh fruits over processed sweets',
+              'Read food labels for hidden sugars'
+            ],
+        filipinoFoodSuggestions: alertLevel === 'high'
+          ? [
+              'Fresh kamote (sweet potato) instead of cake',
+              'Unsweetened malunggay tea',
+              'Grilled fish with kangkong',
+              'Plain rice with vegetables'
+            ]
+          : [
+              'Fresh fruits like saging or mangga',
+              'Unsweetened coffee or tea',
+              'Kamote instead of sweet pastries'
+            ],
+        timestamp: new Date(),
+        isRead: false,
+        actionable: true,
+        cultural_context: 'Filipino cuisine often includes sweet elements. Balance with plenty of vegetables and protein.'
+      };
+      
+      // Save alert tracking
+      await AsyncStorage.setItem('sugar_alert_date', today);
+      await AsyncStorage.setItem('last_sugar_alert_level', alertLevel);
+      
+      return alert;
+      
+    } catch (error) {
+      console.error('Error generating sugar alert:', error);
+      return null;
+    }
   }
 
   /**

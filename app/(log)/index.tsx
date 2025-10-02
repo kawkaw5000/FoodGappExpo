@@ -130,9 +130,18 @@ export default function LogPage() {
               potassium: parseFloat(log.nutrientData.potassium) || 0,
               vitaminA: parseFloat(log.nutrientData.vitaminA) || 0,
               vitaminC: parseFloat(log.nutrientData.vitaminC) || 0,
-              micronutrients: log.nutrientData.micronutrients || log.nutrientData.MicroNutrients || "",
-              nutrientLogId: log.nutrientData.nutrientLogId // camelCase
+              micronutrients: log.nutrientData.microNutrients || log.nutrientData.MicroNutrients || log.nutrientData.micronutrients || "",
+              nutrientLogId: log.nutrientData.nutrientLogId, // camelCase
             };
+          })
+          .map((food: any) => {
+            // Debug micronutrients data
+            console.log("Food micronutrients debug:", {
+              name: food.name,
+              micronutrients: food.micronutrients,
+              hasMicronutrients: !!(food.micronutrients && food.micronutrients.trim())
+            });
+            return food;
           });
         
         console.log("Transformed logs:", transformedLogs);
@@ -320,12 +329,15 @@ export default function LogPage() {
                 </View>
               </View>
               
-              {(selectedFood as any)?.micronutrients && (
-                <View style={styles.micronutrientsSection}>
-                  <Text style={styles.micronutrientsLabel}>Micronutrients:</Text>
-                  <Text style={styles.micronutrientsText}>{(selectedFood as any).micronutrients}</Text>
-                </View>
-              )}
+              {/* Micronutrients Section - matches scan popup style */}
+              <View style={styles.micronutrientsSection}>
+                <Text style={styles.micronutrientsLabel}>Micronutrients:</Text>
+                {selectedFood?.micronutrients && selectedFood.micronutrients.trim() ? (
+                  <Text style={styles.micronutrientsText}>{selectedFood.micronutrients}</Text>
+                ) : (
+                  <Text style={styles.micronutrientsPlaceholder}>No micronutrient data available for this food</Text>
+                )}
+              </View>
               
               <Text style={styles.nutritionFactsTitle}>Log Information</Text>
               <View style={styles.nutritionFacts}>
@@ -335,17 +347,7 @@ export default function LogPage() {
                     {formatLoggedDate(selectedFood?.loggedDate)}
                   </Text>
                 </View>
-                <View style={styles.nutrientRow}>
-                  <Text style={styles.nutrientName}>Food Log ID</Text>
-                  <Text style={styles.nutrientValue}>FoodLogId: {selectedFood?.id}</Text>
-                  <Text style={styles.nutrientValue}>FoodId: {selectedFood?.foodId ?? 'N/A'}</Text>
-                </View>
-                {selectedFood?.nutrientLogId && (
-                  <View style={styles.nutrientRow}>
-                    <Text style={styles.nutrientName}>Nutrient Log ID</Text>
-                    <Text style={styles.nutrientValue}>{selectedFood.nutrientLogId}</Text>
-                  </View>
-                )}
+
               </View>
             </ScrollView>
             
@@ -585,10 +587,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   micronutrientsSection: {
-    marginTop: 15,
-    paddingTop: 15,
+    marginTop: 16,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
+    marginBottom: 8,
   },
   micronutrientsLabel: {
     fontSize: 14,
@@ -600,6 +603,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     lineHeight: 18,
+    fontStyle: 'italic',
   },
+  micronutrientsPlaceholder: {
+    fontSize: 12,
+    color: '#999',
+    lineHeight: 18,
+    fontStyle: 'italic',
+    opacity: 0.7,
+  },
+
   // Nutrition tracking styles removed - moved to Track tab
 });

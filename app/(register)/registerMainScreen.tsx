@@ -5,6 +5,7 @@ import CustomButton from "@/components/buttons/CustomButton";
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useState } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function RegisterMainScreen() {
   const router = useRouter();
@@ -14,12 +15,46 @@ export default function RegisterMainScreen() {
   const [gender, setGender] = useState<number | null>(null);
   const [weight, setWeight] = useState<string>("");
   const [height, setHeight] = useState<string>("");
+  const [firstName, setFirstName] = useState<string>("");
+  const [lastName, setLastName] = useState<string>("");
 
   const onChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (event.type === "set" && selectedDate) {
       setBirthdate(selectedDate);
     }
     setShowPicker(false);
+  };
+
+  const handleContinue = async () => {
+    // Calculate age from birthdate
+    let calculatedAge = null;
+    if (birthdate) {
+      const today = new Date();
+      calculatedAge = today.getFullYear() - birthdate.getFullYear();
+      const monthDiff = today.getMonth() - birthdate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthdate.getDate())) {
+        calculatedAge--;
+      }
+    }
+
+    // Save profile data to AsyncStorage
+    const profileData = {
+      firstName,
+      lastName,
+      age: calculatedAge,
+      gender,
+      weight: weight ? parseFloat(weight) : null,
+      height: height ? parseFloat(height) : null,
+      birthdate: birthdate ? birthdate.toISOString() : null,
+    };
+
+    try {
+      await AsyncStorage.setItem('registrationProfileData', JSON.stringify(profileData));
+      router.replace("/(register)/registerScreen");
+    } catch (error) {
+      console.error('Error saving profile data:', error);
+      router.replace("/(register)/registerScreen");
+    }
   };
 
   return (
@@ -45,7 +80,9 @@ export default function RegisterMainScreen() {
               borderRadius: 5,
               width: "100%",
             }}
-            placeholder="Your first name"            
+            placeholder="Your first name"
+            value={firstName}
+            onChangeText={setFirstName}
           />
           <View style={{position: "absolute", top:-30}}>
             <Text style={{fontSize: 15, fontWeight: "bold"}}>First name</Text>
@@ -61,7 +98,9 @@ export default function RegisterMainScreen() {
               borderRadius: 5,
               width: "100%",
             }}
-            placeholder="Your last name"             
+            placeholder="Your last name"
+            value={lastName}
+            onChangeText={setLastName}
           />
           <View style={{position: "absolute", top:-30}}>
             <Text style={{fontSize: 15, fontWeight: "bold"}}>Last name</Text>
@@ -184,7 +223,10 @@ export default function RegisterMainScreen() {
                 borderRadius: 5,
                 width: width * 0.41,
               }}
-              placeholder="Kilogram"             
+              placeholder="Kilogram"
+              value={weight}
+              onChangeText={setWeight}
+              keyboardType="numeric"
             />
             <View style={{position: "absolute", top:-30}}>
               <Text style={{fontSize: 15, fontWeight: "bold"}}>Weight</Text>
@@ -200,7 +242,10 @@ export default function RegisterMainScreen() {
                 borderRadius: 5,
                 width: width * 0.41,
               }}
-              placeholder="Centimeter"             
+              placeholder="Centimeter"
+              value={height}
+              onChangeText={setHeight}
+              keyboardType="numeric"
             />
             <View style={{position: "absolute", top:-30}}>
               <Text style={{fontSize: 15, fontWeight: "bold"}}>Height</Text>
@@ -238,7 +283,7 @@ export default function RegisterMainScreen() {
               shadowOpacity: 0.2,
               shadowRadius: 3, 
             }}
-            onPress={() => router.replace("/(register)/registerScreen")}
+            onPress={handleContinue}
           >
             <MaterialIcons name="arrow-forward" size={54} color="white" />
           </TouchableOpacity>
