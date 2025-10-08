@@ -152,10 +152,9 @@ export default function TrackPage() {
       return 'Invalid date';
     }
   };
-  const [currentDay, setCurrentDay] = useState(getTodayName());
+  // Removed currentDay state - now using getTodayName() directly
   // Removed Weekly View state
-  const [showGroceryList, setShowGroceryList] = useState(false);
-  const [groceryItems, setGroceryItems] = useState<string[]>([]);
+  // Removed grocery list state
   const [showMealPrepTips, setShowMealPrepTips] = useState(false);
   
   // Exercise suggestions state
@@ -593,18 +592,26 @@ export default function TrackPage() {
     }, [])
   );
 
-  // Fetch recommendations and weekly meal plan
+  // Fetch recommendations and today's meal plan
 
   const resolvePythonBase = () => Config.PYTHON_BASE || Config.BASE_URL;
 
-  const fetchWeeklyMealPlan = async () => {
+  const fetchTodaysMealPlan = async () => {
     setMealPlanError(null);
     setIsLoadingMealPlan(true);
     try {
       if (!profile || profile.weight == null || profile.height == null) {
         throw new Error('Profile incomplete: set height & weight in profile screen.');
       }
-      const payload = { weight: profile.weight, height_cm: profile.height, max_results: 28 };
+      
+      // Get current day name
+      const today = new Date();
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const currentDay = dayNames[today.getDay()];
+      
+      console.log(`[MealPlan] Generating meal plan for ${currentDay}, ${today.toLocaleDateString()}`);
+      
+      const payload = { weight: profile.weight, height_cm: profile.height, max_results: 4 };
       const base = resolvePythonBase();
   const url = `${base}${Config.MEALPLAN_ENDPOINT || '/get_food_recommendations'}`;
       console.log('[MealPlan] POST', url, payload);
@@ -621,7 +628,7 @@ export default function TrackPage() {
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), 60000);
       let response: Response;
       try {
         response = await fetch(url, {
@@ -631,7 +638,7 @@ export default function TrackPage() {
             signal: controller.signal
         });
       } catch (e: any) {
-        if (e.name === 'AbortError') throw new Error('Request timed out (30s). Is the Python server running?');
+        if (e.name === 'AbortError') throw new Error('Request timed out (60s). Is the Python server running?');
         throw e;
       } finally {
         clearTimeout(timeout);
@@ -642,29 +649,35 @@ export default function TrackPage() {
         throw new Error(`HTTP ${response.status} ${response.statusText}: ${txt.slice(0,140)}`);
       }
       let data: any;
-      try { data = await response.json(); } catch { throw new Error('Response is not valid JSON.'); }
+      try { 
+        data = await response.json(); 
+        console.log('[MealPlan] DEBUG - Full response from Python service:', JSON.stringify(data, null, 2));
+        console.log('[MealPlan] DEBUG - Response type:', typeof data);
+        console.log('[MealPlan] DEBUG - Response keys:', data ? Object.keys(data) : 'null/undefined');
+        console.log('[MealPlan] DEBUG - Has foods property:', data && 'foods' in data);
+        console.log('[MealPlan] DEBUG - foods type:', data && data.foods ? typeof data.foods : 'missing');
+        console.log('[MealPlan] DEBUG - foods isArray:', data && data.foods ? Array.isArray(data.foods) : 'no foods property');
+      } catch { 
+        throw new Error('Response is not valid JSON.'); 
+      }
   if (!data || !Array.isArray(data.foods)) throw new Error('Response missing foods array.');
       const foods: FoodRecommendation[] = data.foods;
       if (foods.length < 4) throw new Error('Not enough food items returned (need at least 4).');
 
-      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const mealPlan: MealPlan[] = [];
-      for (let i = 0; i < 7; i++) {
-        const dayMeals = foods.slice(i * 4, (i + 1) * 4);
-        if (dayMeals.length < 4) break; // stop if incomplete day
-        const [breakfast, lunch, dinner, snack] = dayMeals;
-        mealPlan.push({
-          id: `day-${i}`,
-          day: days[i],
-          meals: { breakfast, lunch, dinner, snack },
-          totalCalories: (breakfast.Calories||0)+(lunch.Calories||0)+(dinner.Calories||0)+(snack.Calories||0),
-          totalProtein: (breakfast.Protein||0)+(lunch.Protein||0)+(dinner.Protein||0)+(snack.Protein||0),
-          totalFats: (breakfast.Fat||0)+(lunch.Fat||0)+(dinner.Fat||0)+(snack.Fat||0),
-          totalCarbs: (breakfast.Carbs||0)+(lunch.Carbs||0)+(dinner.Carbs||0)+(snack.Carbs||0),
-        });
-      }
-      if (mealPlan.length === 0) throw new Error('Could not build a single full day (need 4 items per day).');
-      setWeeklyMealPlan(mealPlan);
+      // Create today's meal plan with the 4 food recommendations
+      const [breakfast, lunch, dinner, snack] = foods;
+      const todaysMealPlan: MealPlan = {
+        id: `today-${currentDay.toLowerCase()}`,
+        day: currentDay,
+        meals: { breakfast, lunch, dinner, snack },
+        totalCalories: (breakfast.Calories||0)+(lunch.Calories||0)+(dinner.Calories||0)+(snack.Calories||0),
+        totalProtein: (breakfast.Protein||0)+(lunch.Protein||0)+(dinner.Protein||0)+(snack.Protein||0),
+        totalFats: (breakfast.Fat||0)+(lunch.Fat||0)+(dinner.Fat||0)+(snack.Fat||0),
+        totalCarbs: (breakfast.Carbs||0)+(lunch.Carbs||0)+(dinner.Carbs||0)+(snack.Carbs||0),
+      };
+      
+      console.log(`[MealPlan] Generated meal plan for ${currentDay}:`, todaysMealPlan);
+      setWeeklyMealPlan([todaysMealPlan]);
       setShowMealPlan(true);
     } catch (e: any) {
       console.error('[MealPlan] ERROR', e);
@@ -675,7 +688,7 @@ export default function TrackPage() {
     }
   };
 
-  const handleGenerateMealPlan = fetchWeeklyMealPlan;
+  const handleGenerateMealPlan = fetchTodaysMealPlan;
 
   // Fetch meal plan only on button click
 
@@ -683,47 +696,9 @@ export default function TrackPage() {
 
   // ...existing code...
 
-  const handleDayChange = (direction: 'prev' | 'next') => {
-    setCurrentDay(prevDay => {
-      const currentIndex = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].indexOf(prevDay);
-      const newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
-      if (newIndex < 0) return 'monday';
-      if (newIndex > 6) return 'sunday';
-      return ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'][newIndex];
-    });
-  };
+  // Removed day change handler - now always shows today
 
-  // Generate grocery list from meal plan
-  const generateGroceryList = () => {
-    const ingredients: string[] = [];
-    weeklyMealPlan.forEach(plan => {
-      const meals = [plan.meals.breakfast, plan.meals.lunch, plan.meals.dinner, plan.meals.snack];
-      meals.forEach(meal => {
-        const name = (meal.FoodId || meal.NutrientLogId || '').toString().toLowerCase();
-        if (!name) return;
-        if (name.includes('rice')) ingredients.push('Rice');
-        if (name.includes('chicken') || name.includes('manok')) ingredients.push('Chicken');
-        if (name.includes('beef') || name.includes('tapa')) ingredients.push('Beef');
-        if (name.includes('fish') || name.includes('bangus')) ingredients.push('Fresh Fish');
-        if (name.includes('egg')) ingredients.push('Eggs');
-        if (name.includes('vegetable') || name.includes('pinakbet')) ingredients.push('Mixed Vegetables');
-        if (name.includes('tomato')) ingredients.push('Tomatoes');
-        if (name.includes('onion')) ingredients.push('Onions');
-        if (name.includes('garlic')) ingredients.push('Garlic');
-        if (name.includes('ginger')) ingredients.push('Ginger');
-        if (name.includes('soy')) ingredients.push('Soy Sauce');
-        if (name.includes('vinegar')) ingredients.push('Vinegar');
-        if (name.includes('oil')) ingredients.push('Cooking Oil');
-      });
-    });
-    
-    // Remove duplicates and add common staples
-    const uniqueIngredients = [...new Set(ingredients)];
-    uniqueIngredients.push('Salt', 'Black Pepper', 'Sugar', 'Cooking Oil');
-    
-    setGroceryItems(uniqueIngredients);
-    setShowGroceryList(true);
-  };
+  // Removed grocery list generator
 
   // Removed Weekly View handler
 
@@ -897,15 +872,12 @@ export default function TrackPage() {
 
         <View style={styles.actionSection}>
           <TouchableOpacity style={styles.mealPlanButton} onPress={handleGenerateMealPlan}>
-            <Text style={styles.mealPlanButtonText}>Generate Meal Plan</Text>
+            <Text style={styles.mealPlanButtonText}>Generate Today's Meal Plan</Text>
           </TouchableOpacity>
         </View>
 
         {/* Enhanced Planning Tools */}
         <View style={styles.enhancedTools}>
-          <TouchableOpacity style={styles.toolButton} onPress={generateGroceryList}>
-            <Text style={styles.toolButtonText}>🛒 Grocery List</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.toolButton} onPress={handleMealPrepTips}>
             <Text style={styles.toolButtonText}>👨‍🍳 Meal Prep Tips</Text>
           </TouchableOpacity>
@@ -936,18 +908,13 @@ export default function TrackPage() {
         <View style={styles.mealPlanSection}>
           <Text style={styles.sectionTitle}>Today's Meal Plan</Text>
           <View style={styles.daySelector}>
-            <TouchableOpacity onPress={() => handleDayChange('prev')}>
-              <Text style={styles.dayChangeText}>←</Text>
-            </TouchableOpacity>
-            <Text style={styles.currentDayText}>{currentDay.charAt(0).toUpperCase() + currentDay.slice(1)}</Text>
-            <TouchableOpacity onPress={() => handleDayChange('next')}>
-              <Text style={styles.dayChangeText}>→</Text>
-            </TouchableOpacity>
+            <Text style={styles.currentDayText}>{getTodayName().charAt(0).toUpperCase() + getTodayName().slice(1)}</Text>
           </View>
           <View style={styles.mealPlanDetails}>
             {(() => {
-              const plan = weeklyMealPlan.find(p => p.day.toLowerCase() === currentDay);
-              if (!plan) return <Text style={styles.noMealText}>{weeklyMealPlan.length? 'No plan for this day.' : 'Generate a meal plan to see meals.'}</Text>;
+              // Since we now generate only today's plan, just take the first (and only) plan
+              const plan = weeklyMealPlan[0];
+              if (!plan) return <Text style={styles.noMealText}>Generate today's meal plan to see meals.</Text>;
               const entries = [
                 { label: 'Breakfast', item: plan.meals.breakfast },
                 { label: 'Lunch', item: plan.meals.lunch },
@@ -997,32 +964,7 @@ export default function TrackPage() {
 
   {/* Removed Weekly View Modal */}
 
-      {/* Grocery List Modal */}
-      <Modal visible={showGroceryList} animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>🛒 Weekly Grocery List</Text>
-            <TouchableOpacity onPress={() => setShowGroceryList(false)}>
-              <Text style={styles.cancelText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.groceryContent}>
-            <Text style={styles.grocerySubtitle}>Based on your weekly meal plan:</Text>
-            {groceryItems.map((item, index) => (
-              <View key={index} style={styles.groceryItem}>
-                <Text style={styles.groceryItemText}>• {item}</Text>
-              </View>
-            ))}
-            <View style={styles.groceryTips}>
-              <Text style={styles.groceryTipsTitle}>💡 Shopping Tips:</Text>
-              <Text style={styles.groceryTip}>• Buy fresh vegetables from local markets for better prices</Text>
-              <Text style={styles.groceryTip}>• Stock up on rice and cooking oil in bulk</Text>
-              <Text style={styles.groceryTip}>• Choose seasonal fruits for better nutrition and cost</Text>
-              <Text style={styles.groceryTip}>• Buy meat and fish fresh on the day you plan to cook</Text>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      {/* Removed Grocery List Modal */}
 
       {/* Meal Prep Tips Modal */}
       <Modal visible={showMealPrepTips} animationType="slide">
