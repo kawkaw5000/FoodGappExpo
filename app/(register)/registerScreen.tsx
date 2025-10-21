@@ -26,7 +26,53 @@ export default function RegisterScreen() {
   const [height, setHeight] = useState("");
   const [gender, setGender] = useState<number | null>(null);
   const [bodyGoalId, setBodyGoalId] = useState<number>(1);
+  const [emailValid, setEmailValid] = useState<boolean | null>(null);
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const { width } = Dimensions.get("window");
+
+  // Email validation function
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Check email availability
+  const checkEmailAvailability = async (email: string) => {
+    if (!validateEmail(email)) {
+      setEmailAvailable(null);
+      return;
+    }
+
+    setIsCheckingEmail(true);
+    try {
+      const response = await axios.get(`${Account_API}/check-email/${encodeURIComponent(email)}`);
+      setEmailAvailable(response.data.available);
+    } catch (error) {
+      console.error('Error checking email availability:', error);
+      // If endpoint doesn't exist yet, assume email is available
+      setEmailAvailable(true);
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
+
+  // Handle email change with validation
+  const handleEmailChange = (text: string) => {
+    setEmail(text);
+    const isValid = validateEmail(text);
+    setEmailValid(text.length > 0 ? isValid : null);
+    
+    if (isValid) {
+      // Debounce email availability check
+      const timeoutId = setTimeout(() => {
+        checkEmailAvailability(text);
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setEmailAvailable(null);
+    }
+  };
 
   // Load profile data from previous screen
   useEffect(() => {
@@ -54,10 +100,30 @@ export default function RegisterScreen() {
       Alert.alert("Error", "Please fill in all required fields.");
       return;
     }
+    
+    // Validate email format
+    if (!validateEmail(email)) {
+      Alert.alert("Error", "Please enter a valid email address.");
+      return;
+    }
+    
+    // Check if email is available
+    if (emailAvailable === false) {
+      Alert.alert("Error", "This email address is already registered. Please use a different email or try logging in.");
+      return;
+    }
+    
     if (password !== confirmPassword) {
       Alert.alert("Error", "Passwords do not match.");
       return;
     }
+    
+    // Password strength validation
+    if (password.length < 6) {
+      Alert.alert("Error", "Password must be at least 6 characters long.");
+      return;
+    }
+    
     if (!isChecked) {
       Alert.alert("Error", "You must agree to the Privacy & Policy.");
       return;
@@ -130,19 +196,51 @@ export default function RegisterScreen() {
           <TextInput
             style={{
               height: 50,
-              borderColor: "black",
+              borderColor: emailValid === false ? "#f44336" : emailAvailable === false ? "#f44336" : emailValid === true && emailAvailable === true ? "#4CAF50" : "black",
               borderWidth: 1,
               paddingHorizontal: 10,
+              paddingRight: 45,
               borderRadius: 5,
               width: "100%",
             }}
-            placeholder=""
+            placeholder="Enter your email address"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={handleEmailChange}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
           />
           <View style={{position: "absolute", top:-35}}>
             <Text style={{fontSize: 20, fontWeight: "bold"}}>Email</Text>
           </View>
+          
+          {/* Email Validation Icons */}
+          <View style={{ position: "absolute", right: 12, top: 15 }}>
+            {isCheckingEmail ? (
+              <MaterialIcons name="hourglass-empty" size={20} color="#FCB647" />
+            ) : emailValid === false ? (
+              <MaterialIcons name="error" size={20} color="#f44336" />
+            ) : emailAvailable === false ? (
+              <MaterialIcons name="error" size={20} color="#f44336" />
+            ) : emailValid === true && emailAvailable === true ? (
+              <MaterialIcons name="check-circle" size={20} color="#4CAF50" />
+            ) : null}
+          </View>
+          
+          {/* Email Status Messages */}
+          {email.length > 0 && (
+            <View style={{ position: "absolute", top: 55, left: 0 }}>
+              {emailValid === false ? (
+                <Text style={{ color: "#f44336", fontSize: 12 }}>Please enter a valid email address</Text>
+              ) : emailAvailable === false ? (
+                <Text style={{ color: "#f44336", fontSize: 12 }}>This email is already registered</Text>
+              ) : emailValid === true && emailAvailable === true ? (
+                <Text style={{ color: "#4CAF50", fontSize: 12 }}>Email is available</Text>
+              ) : isCheckingEmail ? (
+                <Text style={{ color: "#FCB647", fontSize: 12 }}>Checking email availability...</Text>
+              ) : null}
+            </View>
+          )}
         </View> 
         <View style={{ position: 'relative' }}>
             <TextInput

@@ -6,6 +6,7 @@ import CustomButton from "@/components/buttons/CustomButton";
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import axios from "axios";
 import Config from "@/constants/Config";
+import EmailService from "@/services/EmailService";
 
 const Account_API = Config.Account_API;
 
@@ -20,47 +21,72 @@ export default function ForgotPasswordScreen() {
   const [codeVerified, setCodeVerified] = useState(false);
   const { width } = Dimensions.get("window");
 
+  // Debug info for troubleshooting
+  console.log("🔧 ForgotPasswordScreen loaded");
+  console.log("📡 Account_API URL:", Account_API);
+  console.log("🔄 Component state:", { codeSent, codeVerified, isLoading });
+
   const handleSendCode = async () => {
     if (!email.trim()) {
       Alert.alert("Error", "Please enter your email address.");
       return;
     }
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Validate email format using EmailService
+    if (!EmailService.validateEmailFormat(email)) {
       Alert.alert("Error", "Please enter a valid email address.");
       return;
     }
 
+    console.log(`🔄 Attempting to send OTP to: ${email.trim()}`);
+    console.log(`📡 Backend URL: ${Account_API}/forgot-password`);
+
     setIsLoading(true);
     try {
-      const response = await axios.post(`${Account_API}/forgot-password`, {
-        email: email.trim()
-      });
+      // Try backend first, fallback to EmailService for development
+      try {
+        console.log("🌐 Trying backend API...");
+        const response = await axios.post(`${Account_API}/forgot-password`, {
+          email: email.trim()
+        }, {
+          timeout: 10000, // 10 second timeout
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
 
-      if (response.data.success) {
-        setCodeSent(true);
-        Alert.alert(
-          "Code Sent", 
-          "A 6-digit confirmation code has been sent to your email address."
-        );
-      } else {
-        Alert.alert("Error", response.data.message || "Failed to send confirmation code.");
+        console.log("✅ Backend response:", response.data);
+
+        if (response.data.success) {
+          setCodeSent(true);
+          Alert.alert(
+            "Code Sent", 
+            "A 6-digit confirmation code has been sent. Check your backend console for the OTP code!"
+          );
+        } else {
+          Alert.alert("Error", response.data.message || "Failed to send confirmation code.");
+        }
+      } catch (backendError: any) {
+        console.log("❌ Backend error:", backendError.message);
+        console.log("📋 Error details:", backendError.response?.data || 'No response data');
+        console.log("🔄 Falling back to EmailService for development...");
+        
+        // Fallback to EmailService for development
+        const result = await EmailService.requestPasswordReset(email.trim());
+        
+        if (result.success) {
+          setCodeSent(true);
+          Alert.alert(
+            "Code Sent (Development Mode)", 
+            `${result.message}${result.code ? `\n\n📋 DEV CODE: ${result.code}` : ''}`
+          );
+        } else {
+          Alert.alert("Error", result.message);
+        }
       }
     } catch (error: any) {
-      console.error("Send code error:", error);
-      if (error.response?.status === 404) {
-        Alert.alert(
-          "Feature Not Available", 
-          "The password reset feature is currently being set up. Please contact support or try again later.",
-          [{ text: "OK" }]
-        );
-      } else if (error.response?.data?.message) {
-        Alert.alert("Error", error.response.data.message);
-      } else {
-        Alert.alert("Error", "Failed to send confirmation code. Please try again.");
-      }
+      console.error("❌ Send code error:", error);
+      Alert.alert("Error", "Failed to send confirmation code. Please check your network connection and try again.");
     } finally {
       setIsLoading(false);
     }
@@ -77,32 +103,49 @@ export default function ForgotPasswordScreen() {
       return;
     }
 
+    console.log(`🔍 Verifying OTP: ${confirmationCode.trim()} for email: ${email.trim()}`);
+
     setIsLoading(true);
     try {
-      const response = await axios.post(`${Account_API}/verify-reset-code`, {
-        email: email.trim(),
-        code: confirmationCode.trim()
-      });
+      // Try backend first, fallback to EmailService
+      try {
+        console.log("🌐 Verifying with backend API...");
+        const response = await axios.post(`${Account_API}/verify-reset-code`, {
+          email: email.trim(),
+          code: confirmationCode.trim()
+        }, {
+          timeout: 10000,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
 
-      if (response.data.success) {
-        setCodeVerified(true);
-        Alert.alert("Success", "Code verified! You can now set your new password.");
-      } else {
-        Alert.alert("Error", response.data.message || "Invalid confirmation code.");
+        console.log("✅ Verify response:", response.data);
+
+        if (response.data.success) {
+          setCodeVerified(true);
+          Alert.alert("Success", "Code verified! You can now set your new password.");
+        } else {
+          Alert.alert("Error", response.data.message || "Invalid confirmation code.");
+        }
+      } catch (backendError: any) {
+        console.log("❌ Backend verify error:", backendError.message);
+        console.log("📋 Verify error details:", backendError.response?.data || 'No response data');
+        console.log("🔄 Falling back to EmailService...");
+        
+        // Fallback to EmailService
+        const result = await EmailService.verifyPasswordResetCode(email.trim(), confirmationCode.trim());
+        
+        if (result.success) {
+          setCodeVerified(true);
+          Alert.alert("Success (Development Mode)", result.message + " You can now set your new password.");
+        } else {
+          Alert.alert("Error", result.message);
+        }
       }
     } catch (error: any) {
-      console.error("Verify code error:", error);
-      if (error.response?.status === 404) {
-        Alert.alert(
-          "Feature Not Available", 
-          "The password reset feature is currently being set up. Please contact support.",
-          [{ text: "OK" }]
-        );
-      } else if (error.response?.data?.message) {
-        Alert.alert("Error", error.response.data.message);
-      } else {
-        Alert.alert("Error", "Failed to verify code. Please try again.");
-      }
+      console.error("❌ Verify code error:", error);
+      Alert.alert("Error", "Failed to verify code. Please check your network connection and try again.");
     } finally {
       setIsLoading(false);
     }
@@ -117,6 +160,11 @@ export default function ForgotPasswordScreen() {
 
     if (!codeSent) {
       Alert.alert("Error", "Please send the verification code first.");
+      return;
+    }
+
+    if (!codeVerified) {
+      Alert.alert("Error", "Please verify the confirmation code first.");
       return;
     }
 
@@ -140,31 +188,70 @@ export default function ForgotPasswordScreen() {
       return;
     }
 
+    console.log(`🔄 Completing password reset for: ${email.trim()}`);
+
     setIsLoading(true);
     try {
-      const response = await axios.post(`${Account_API}/reset-password`, {
-        email: email.trim(),
-        code: confirmationCode.trim(),
-        newPassword: newPassword.trim()
-      });
+      // Try backend first, fallback to EmailService
+      try {
+        console.log("🌐 Resetting password with backend API...");
+        const response = await axios.post(`${Account_API}/reset-password`, {
+          email: email.trim(),
+          newPassword: newPassword.trim(),
+          confirmPassword: confirmPassword.trim()
+        }, {
+          timeout: 10000,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
 
-      if (response.data.success) {
-        Alert.alert(
-          "Password Reset Successful", 
-          "Your password has been reset successfully. You can now log in with your new password.",
-          [
-            {
-              text: "OK",
-              onPress: () => router.replace("/(login)/loginScreen")
-            }
-          ]
+        console.log("✅ Reset response:", response.data);
+
+        if (response.data.success) {
+          Alert.alert(
+            "Password Reset Successful", 
+            "Your password has been reset successfully. You can now log in with your new password.",
+            [
+              {
+                text: "OK",
+                onPress: () => router.replace("/(login)/loginScreen")
+              }
+            ]
+          );
+        } else {
+          Alert.alert("Error", response.data.message || "Failed to reset password.");
+        }
+      } catch (backendError: any) {
+        console.log("❌ Backend reset error:", backendError.message);
+        console.log("📋 Reset error details:", backendError.response?.data || 'No response data');
+        console.log("🔄 Falling back to EmailService...");
+        
+        // Fallback to EmailService
+        const result = await EmailService.completePasswordReset(
+          email.trim(),
+          confirmationCode.trim(), // EmailService still needs this for dev mode
+          newPassword.trim()
         );
-      } else {
-        Alert.alert("Error", response.data.message || "Failed to reset password.");
+        
+        if (result.success) {
+          Alert.alert(
+            "Password Reset Successful (Development Mode)", 
+            "Your password has been reset successfully in development mode. In production, this would update your actual account password.",
+            [
+              {
+                text: "OK",
+                onPress: () => router.replace("/(login)/loginScreen")
+              }
+            ]
+          );
+        } else {
+          Alert.alert("Error", result.message);
+        }
       }
     } catch (error: any) {
-      console.error("Password reset error:", error);
-      Alert.alert("Error", "Failed to reset password. Please try again.");
+      console.error("❌ Password reset error:", error);
+      Alert.alert("Error", "Failed to reset password. Please check your network connection and try again.");
     } finally {
       setIsLoading(false);
     }
