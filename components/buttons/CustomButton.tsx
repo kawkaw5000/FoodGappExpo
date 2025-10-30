@@ -7,14 +7,17 @@ interface CustomButtonProps {
   textColor?: string;
   style?: ViewStyle;
   disabled?: boolean;
+  testID?: string;
 }
 
-export default function CustomButton({ title, onPress, backgroundColor = "#6200ea", textColor = "white", style, disabled = false }: CustomButtonProps) {
+export default function CustomButton({ title, onPress, backgroundColor = "#6200ea", textColor = "white", style, disabled = false, testID }: CustomButtonProps) {
   return (
     <TouchableOpacity 
       style={[styles.button, { backgroundColor: disabled ? "#ccc" : backgroundColor }, style]} 
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      testID={testID}
     >
       <Text style={[styles.buttonText, { color: disabled ? "#666" : textColor }]}>{title}</Text>
     </TouchableOpacity>

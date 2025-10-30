@@ -79,6 +79,7 @@ export default function LoginScreen() {
             placeholder=""
             value={email}
             onChangeText={setEmail}
+            testID="login-email"
           />
           <View style={{ position: "absolute", top: -35 }}>
             <Text style={{ fontSize: 20, fontWeight: "bold" }}>Email</Text>
@@ -99,6 +100,7 @@ export default function LoginScreen() {
             value={password}
             secureTextEntry={!isPasswordVisible}
             onChangeText={setPassword}
+            testID="login-password"
           />
           <View style={{ position: 'absolute', top: -35 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Password</Text>
@@ -121,6 +123,7 @@ export default function LoginScreen() {
           onPress={handleLogin}
           backgroundColor="#FCB647"
           textColor="white"
+          testID="login-submit"
         />
         <TouchableOpacity onPress={() => router.push("/(login)/ForgotPasswordScreen")}>
           <Text style={{ fontSize: 12, fontWeight: "bold", textAlign: "center", textDecorationLine: "underline", color: "#6D7ABC" }}>
