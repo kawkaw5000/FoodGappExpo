@@ -1,6 +1,9 @@
 // Railway Production URLs
 const RAILWAY_ASPNET_URL = "https://foodgappbackendwebapi-production.up.railway.app";
-const RAILWAY_PYTHON_URL = ""; // Add your Python service Railway URL here if deployed
+// Optional: if you deployed Python endpoints as a separate Railway service, put its URL here.
+// If left empty, the code will fall back to using the ASP.NET Railway URL (useful when
+// the Python endpoints are integrated into the same backend service you already deployed).
+let RAILWAY_PYTHON_URL = "https://worthy-compassion-production.up.railway.app"; // Add your Python service Railway URL here if deployed
 
 // For local development, you can switch between Railway and local
 const USE_RAILWAY = true; // Set to false for local development
@@ -11,8 +14,13 @@ const EXPRESS_PORT = "5000";        // Python/Flask service port
 const ASPNET_PORT = "5129";         // .NET API port
 
 // Choose between Railway and local
-const PYTHON_BASE = USE_RAILWAY 
-  ? RAILWAY_PYTHON_URL 
+// If using Railway and `RAILWAY_PYTHON_URL` is empty, fall back to the ASP.NET Railway URL
+if (USE_RAILWAY && !RAILWAY_PYTHON_URL) {
+  RAILWAY_PYTHON_URL = RAILWAY_ASPNET_URL;
+}
+
+const PYTHON_BASE = USE_RAILWAY
+  ? RAILWAY_PYTHON_URL
   : `http://${BASE_IP}:${EXPRESS_PORT}`;
 
 const ASPNET_BASE = USE_RAILWAY
