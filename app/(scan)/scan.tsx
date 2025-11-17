@@ -510,32 +510,24 @@ export default function ScanPage() {
                 ) : nutritionData ? (
                   <>
                     <View style={styles.caloriesSection}>
-                      <Text style={styles.caloriesText}>{fmt2(nutritionData.calories).toString()} cal</Text>
+                      <Text style={styles.caloriesText}>{fmt2(nutritionData.calories)} cal</Text>
                     </View>
                     <View style={styles.macrosSection}>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Protein</Text>
-                        <Text style={[styles.macroValue, {color: '#FF5722'}]}>{fmt2(
-                          nutritionData.protein ?? (nutritionData as any).Protein ?? 0
-                        ).toString()}g</Text>
+                        <Text style={[styles.macroValue, {color: '#FF5722'}]}>{fmt2(nutritionData.protein ?? (nutritionData as any).Protein ?? 0)}g</Text>
                       </View>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Fats</Text>
-                        <Text style={[styles.macroValue, {color: '#FF9800'}]}>{fmt2(
-                          nutritionData.fats ?? (nutritionData as any).fat ?? (nutritionData as any).Fat ?? 0
-                        ).toString()}g</Text>
+                        <Text style={[styles.macroValue, {color: '#FF9800'}]}>{fmt2(nutritionData.fats ?? (nutritionData as any).fat ?? (nutritionData as any).Fat ?? 0)}g</Text>
                       </View>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Carbs</Text>
-                        <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{fmt2(
-                          nutritionData.carbs ?? (nutritionData as any).carbohydrates ?? (nutritionData as any).Carbs ?? 0
-                        ).toString()}g</Text>
+                        <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{fmt2(nutritionData.carbs ?? (nutritionData as any).carbohydrates ?? (nutritionData as any).Carbs ?? 0)}g</Text>
                       </View>
                       <View style={styles.macroItem}>
                         <Text style={styles.macroLabel}>Sugar</Text>
-                        <Text style={[styles.macroValue, {color: '#9C27B0'}]}>{fmt2(
-                          nutritionData.sugar ?? (nutritionData as any).Sugar ?? 0
-                        ).toString()}g</Text>
+                        <Text style={[styles.macroValue, {color: '#9C27B0'}]}>{fmt2(nutritionData.sugar ?? (nutritionData as any).Sugar ?? 0)}g</Text>
                       </View>
                     </View>
                     <View style={styles.micronutrientsSection}>

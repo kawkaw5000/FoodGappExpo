@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ViewShot from 'react-native-view-shot';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SocialSharingService, { ShareData } from '../services/SocialSharingService';
@@ -12,10 +13,21 @@ interface ShareModalProps {
 const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
   const [sharing, setSharing] = useState(false);
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
+  const [foodList, setFoodList] = useState<any[]>([]);
+  const previewRef = React.useRef(null);
+  const [imageUri, setImageUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
       loadAvailablePlatforms();
+      // Load today's food logs (replace with your actual API or context)
+      // Example: fetch from AsyncStorage or API
+      // setFoodList([{ name: 'Adobo', calories: 285 }, ...]);
+      // For now, use placeholder
+      setFoodList([
+        { name: 'Adobo', calories: 285, protein: 25, carbs: 8, fats: 18 },
+        { name: 'Pancit Canton', calories: 340, protein: 12, carbs: 52, fats: 11 },
+      ]);
     }
   }, [visible]);
 
@@ -38,9 +50,19 @@ const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
 
   const handleShare = async (platform: string) => {
     if (sharing) return;
-    
     setSharing(true);
     let success = false;
+
+    // Capture the preview card as an image
+    let uri: string | null = null;
+    try {
+      if (previewRef.current) {
+        uri = await (previewRef.current as any).capture();
+        setImageUri(uri);
+      }
+    } catch (e) {
+      console.warn('ViewShot capture failed:', e);
+    }
 
     try {
       switch (platform) {
@@ -63,7 +85,11 @@ const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
           success = await SocialSharingService.copyToClipboard(data);
           break;
         case 'generic':
-          success = await SocialSharingService.shareGeneric(data);
+          if (uri) {
+            success = await SocialSharingService.shareImageGeneric(uri);
+          } else {
+            success = await SocialSharingService.shareGeneric(data);
+          }
           break;
         default:
           Alert.alert('Error', 'Platform not supported');
@@ -108,7 +134,8 @@ const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.progressSummary}>
+          {/* Preview Card for Sharing */}
+          <ViewShot ref={previewRef} options={{ format: 'png', quality: 0.95 }} style={styles.progressSummary}>
             <Text style={styles.dateText}>{data.date}</Text>
             {data.userName && (
               <View style={styles.userInfo}>
@@ -137,7 +164,24 @@ const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
               <Text style={styles.macroText}>Fats {data.fats}g</Text>
               <Text style={styles.macroText}>Carbs {data.carbs}g</Text>
             </View>
-          </View>
+            {/* Food List Section */}
+            <View style={{ marginTop: 15 }}>
+              <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>Foods Scanned/Logged Today:</Text>
+              {foodList.length > 0 ? (
+                foodList.map((food, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 14 }}>{food.name}</Text>
+                    <Text style={{ fontSize: 14, color: '#4CAF50' }}>{food.calories} kcal</Text>
+                    <Text style={{ fontSize: 12, color: '#FF5722' }}>{food.protein}g P</Text>
+                    <Text style={{ fontSize: 12, color: '#2196F3' }}>{food.carbs}g C</Text>
+                    <Text style={{ fontSize: 12, color: '#FFC107' }}>{food.fats}g F</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={{ fontSize: 14, color: '#888' }}>No foods logged today.</Text>
+              )}
+            </View>
+          </ViewShot>
 
           <View style={styles.platformsContainer}>
             {availablePlatforms.map((platform) => {
@@ -179,7 +223,7 @@ const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
       </View>
     </Modal>
   );
-};
+}
 
 const styles = StyleSheet.create({
   overlay: {

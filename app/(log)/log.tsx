@@ -15,7 +15,7 @@ export default function LogPage() {
       <ScrollView>
         <View style={styles.header}>
           <View style={styles.progressCircle}>
-            <Text style={styles.progressText}>0 / 2000</Text>
+            <Text style={styles.progressText}>{Number(0).toFixed(2)} / {Number(2000).toFixed(2)}</Text>
             <Text style={styles.progressSubText}>kcal</Text>
           </View>
         </View>

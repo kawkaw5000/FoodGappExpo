@@ -554,22 +554,22 @@ export default function TrackPage() {
         {/* Daily Progress */}
         <View style={styles.progressSection}>
           <View style={styles.progressCircle}>
-            <Text style={styles.progressText}>{Number(totalMacros.calories).toFixed(1)}</Text>
-            <Text style={styles.progressSubText}>/ {Number(dailyGoal).toFixed(1)} kcal</Text>
+            <Text style={styles.progressText}>{Number(totalMacros.calories).toFixed(2)}</Text>
+            <Text style={styles.progressSubText}>/ {Number(dailyGoal).toFixed(2)} kcal</Text>
           </View>
           <Text style={styles.progressLabel}>Today's Intake</Text>
           <View style={styles.macrosRow}>
             <View style={styles.macroBox}>
               <Text style={styles.macroLabel}>Protein</Text>
-              <Text style={styles.macroValue}>{Number(totalMacros.protein).toFixed(1)}g</Text>
+              <Text style={styles.macroValue}>{Number(totalMacros.protein).toFixed(2)}g</Text>
             </View>
             <View style={styles.macroBox}>
               <Text style={styles.macroLabel}>Carbs</Text>
-              <Text style={styles.macroValue}>{Number(totalMacros.carbs).toFixed(1)}g</Text>
+              <Text style={styles.macroValue}>{Number(totalMacros.carbs).toFixed(2)}g</Text>
             </View>
             <View style={styles.macroBox}>
               <Text style={styles.macroLabel}>Fats</Text>
-              <Text style={styles.macroValue}>{Number(totalMacros.fats).toFixed(1)}g</Text>
+              <Text style={styles.macroValue}>{Number(totalMacros.fats).toFixed(2)}g</Text>
             </View>
           </View>
         </View>
@@ -699,19 +699,19 @@ export default function TrackPage() {
                 <View style={styles.nutritionRow}>
                   <View style={styles.nutritionItem}>
                     <Text style={styles.nutritionLabel}>Calories</Text>
-                    <Text style={styles.nutritionValue}>{Number(food.calories).toFixed(1)}</Text>
+                    <Text style={styles.nutritionValue}>{Number(food.calories).toFixed(2)}</Text>
                   </View>
                   <View style={styles.nutritionItem}>
                     <Text style={styles.nutritionLabel}>Protein</Text>
-                    <Text style={styles.nutritionValue}>{Number(food.protein).toFixed(1)}g</Text>
+                    <Text style={styles.nutritionValue}>{Number(food.protein).toFixed(2)}g</Text>
                   </View>
                   <View style={styles.nutritionItem}>
                     <Text style={styles.nutritionLabel}>Carbs</Text>
-                    <Text style={styles.nutritionValue}>{Number(food.carbs).toFixed(1)}g</Text>
+                    <Text style={styles.nutritionValue}>{Number(food.carbs).toFixed(2)}g</Text>
                   </View>
                   <View style={styles.nutritionItem}>
                     <Text style={styles.nutritionLabel}>Fats</Text>
-                    <Text style={styles.nutritionValue}>{Number(food.fats).toFixed(1)}g</Text>
+                    <Text style={styles.nutritionValue}>{Number(food.fats).toFixed(2)}g</Text>
                   </View>
                 </View>
               </View>
@@ -733,7 +733,7 @@ export default function TrackPage() {
             {todayLogs.map((log) => (
               <View key={log.id} style={styles.trackedItem}>
                 <Text style={styles.trackedName}>{log.name}</Text>
-                <Text style={styles.trackedCalories}>{Number(log.calories).toFixed(1)} kcal</Text>
+                <Text style={styles.trackedCalories}>{Number(log.calories).toFixed(2)} kcal</Text>
               </View>
             ))}
           </View>
@@ -746,7 +746,7 @@ export default function TrackPage() {
             {foodLogs.map((log) => (
               <View key={log.id} style={styles.trackedItem}>
                 <Text style={styles.trackedName}>{log.name}</Text>
-                <Text style={styles.trackedCalories}>{Number(log.calories).toFixed(1)} kcal</Text>
+                <Text style={styles.trackedCalories}>{Number(log.calories).toFixed(2)} kcal</Text>
                 <Text style={{ fontSize: 12, color: '#888' }}>{log.date}</Text>
               </View>
             ))}

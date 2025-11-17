@@ -17,6 +17,25 @@ export interface ShareData {
 }
 
 class SocialSharingService {
+  // Share an image file using expo-sharing
+  static async shareImageGeneric(imageUri: string): Promise<boolean> {
+    try {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(imageUri, {
+          mimeType: 'image/png',
+          dialogTitle: 'Share your FoodGapp progress',
+        });
+        return true;
+      } else {
+        Alert.alert('Sharing not available', 'Cannot share image on this device.');
+        return false;
+      }
+    } catch (error) {
+      console.error('Image sharing error:', error);
+      Alert.alert('Error', 'Could not share your progress image. Please try again.');
+      return false;
+    }
+  }
   
   private static generateShareText(data: ShareData): string {
     const { calories, goal, remaining, protein, fats, carbs, date, userName, level, badge } = data;
@@ -162,14 +181,14 @@ ${userName ? `👤 ${userName}` : ''}${level ? ` • Level ${level} ${badge || '
       
       if (await Sharing.isAvailableAsync()) {
         // Create a temporary text file
-        const fileUri = FileSystem.documentDirectory + 'foodgapp_progress.txt';
+  const fileUri = 'file:///tmp/foodgapp_progress.txt';
         await FileSystem.writeAsStringAsync(fileUri, shareText);
-        
+
         await Sharing.shareAsync(fileUri, {
           mimeType: 'text/plain',
           dialogTitle: 'Share your FoodGapp progress',
         });
-        
+
         // Clean up the temporary file
         await FileSystem.deleteAsync(fileUri, { idempotent: true });
         return true;
