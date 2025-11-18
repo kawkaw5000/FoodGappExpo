@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   // Enhanced Header Styles
   headerSection: {
     backgroundColor: "white",
-    paddingTop: 20,
+    paddingTop: 50, // Increased padding for status bar area
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomLeftRadius: 25,

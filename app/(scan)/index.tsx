@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   // Header Section
   headerSection: {
     backgroundColor: "white",
-    paddingTop: 20,
+    paddingTop: 35, // Reduced top padding 
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomLeftRadius: 25,

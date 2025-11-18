@@ -383,10 +383,14 @@ export default function ScanPage() {
     return nutrition;
   };
 
-  // Helper: format number to at most 2 decimals
+  // Helper: format number to at most 2 decimals (smart formatting)
   const fmt2 = (n: number | string | undefined | null): number => {
     const v = Number(n ?? 0);
-    return Number.isFinite(v) ? Number(v.toFixed(2)) : 0;
+    if (!Number.isFinite(v)) return 0;
+    // If it's a whole number, don't show decimals
+    if (v % 1 === 0) return v;
+    // Otherwise show up to 2 decimals
+    return Number(v.toFixed(2));
   };
 
   // Helper: safely extract sugar value from various possible field names
@@ -600,8 +604,8 @@ const styles = StyleSheet.create({
   scrollContent: { alignItems: "center", paddingBottom: 40 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   cameraBoxWrapper: {
-    width: 300,
-    height: 300,
+    width: 225,
+    height: 225,
     borderRadius: 20,
     overflow: "hidden",
     borderWidth: 3,

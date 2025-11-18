@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Image, ImageSourcePropType, StyleSheet, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface NavItem {
   name: string;
@@ -17,6 +18,7 @@ interface BottomNavBarProps {
 const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handleNav }) => {
   const animationValues = useRef<Record<string, Animated.Value>>({});
   const navItems = NavImg();
+  const insets = useSafeAreaInsets();
 
   // Initialize animation values for each nav item
   useEffect(() => {
@@ -116,7 +118,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ NavImg, currentRoute, handl
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       {/* Navigation Items */}
       <View style={styles.bottomBar}>
         {navItems.map((item, index) => {
@@ -213,8 +215,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     width: "100%",
-    paddingVertical: 12,
-    paddingBottom: 16,
+    paddingVertical: 8,
+    paddingTop: 12,
     backgroundColor: "#fff",
   },
   

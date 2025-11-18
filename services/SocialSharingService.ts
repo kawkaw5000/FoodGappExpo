@@ -17,13 +17,19 @@ export interface ShareData {
 }
 
 class SocialSharingService {
+  // Helper function to format numbers
+  private static formatValue(value: number): string {
+    if (value % 1 === 0) return value.toString();
+    return value.toFixed(1);
+  }
+
   // Share an image file using expo-sharing
   static async shareImageGeneric(imageUri: string): Promise<boolean> {
     try {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(imageUri, {
           mimeType: 'image/png',
-          dialogTitle: 'Share your FoodGapp progress',
+          dialogTitle: 'Share your WellNu progress',
         });
         return true;
       } else {
@@ -40,25 +46,25 @@ class SocialSharingService {
   private static generateShareText(data: ShareData): string {
     const { calories, goal, remaining, protein, fats, carbs, date, userName, level, badge } = data;
     
-    return `🍎 My FoodGapp Progress - ${date} 🍎
+    return `🍎 My WellNu Progress - ${date} 🍎
 
 ${userName ? `👤 ${userName}` : ''}${level ? ` • Level ${level} ${badge || '⭐'}` : ''}
 
 📊 Daily Summary:
-• Consumed: ${calories} cal
-• Goal: ${goal} kcal  
-• Remaining: ${remaining} kcal
+• Consumed: ${this.formatValue(calories)} cal
+• Goal: ${this.formatValue(goal)} kcal  
+• Remaining: ${this.formatValue(remaining)} kcal
 
 🥗 Macros:
-• Protein: ${protein}g
-• Fats: ${fats}g
-• Carbs: ${carbs}g
+• Protein: ${this.formatValue(protein)}g
+• Fats: ${this.formatValue(fats)}g  
+• Carbs: ${this.formatValue(carbs)}g
 
-#FoodGapp #HealthyEating #FitnessJourney #NutritionTracking`;
+#WellNu #HealthyEating #NutritionTracking #FitnessJourney`;
   }
 
   private static generateHashtags(): string {
-    return '#FoodGapp #HealthyEating #FitnessJourney #NutritionTracking #HealthyLifestyle #CalorieCounter #MacroTracking #WellnessWednesday #HealthGoals #FoodDiary';
+    return '#WellNu #HealthyEating #NutritionTracking #FitnessJourney';
   }
 
   // Facebook Sharing
@@ -66,7 +72,7 @@ ${userName ? `👤 ${userName}` : ''}${level ? ` • Level ${level} ${badge || '
     try {
       const shareText = this.generateShareText(data);
       const encodedText = encodeURIComponent(shareText);
-      const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=https://foodgapp.com&quote=${encodedText}`;
+      const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=https://wellnu.com&quote=${encodedText}`;
       
       const canOpen = await Linking.canOpenURL(facebookUrl);
       if (canOpen) {

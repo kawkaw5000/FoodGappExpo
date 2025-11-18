@@ -56,6 +56,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingVertical: 20,
+    paddingTop: 45, // Add more top padding for status bar
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },

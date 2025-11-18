@@ -344,11 +344,11 @@ export default function TrackPage() {
     return {
       ...totals,
       ...goals,
-      caloriesProgress: Math.min((totals.totalCalories / goals.goalCalories) * 100, 100),
-      proteinProgress: Math.min((totals.totalProtein / goals.goalProtein) * 100, 100),
-      fatsProgress: Math.min((totals.totalFats / goals.goalFats) * 100, 100),
-      carbsProgress: Math.min((totals.totalCarbs / goals.goalCarbs) * 100, 100),
-      sugarsProgress: Math.min((totals.totalSugars / goals.goalSugars) * 100, 100), // Add sugar progress
+      caloriesProgress: (totals.totalCalories / goals.goalCalories) * 100,
+      proteinProgress: (totals.totalProtein / goals.goalProtein) * 100,
+      fatsProgress: (totals.totalFats / goals.goalFats) * 100,
+      carbsProgress: (totals.totalCarbs / goals.goalCarbs) * 100,
+      sugarsProgress: (totals.totalSugars / goals.goalSugars) * 100,
     };
   };
 
@@ -384,11 +384,35 @@ export default function TrackPage() {
         message: `Your protein intake is at ${Math.round(summary.proteinProgress)}%. Add some eggs, fish, or beans to boost protein.`,
         icon: '🥚'
       });
+    } else if (summary.proteinProgress > 110) {
+      insights.push({
+        type: 'warning',
+        message: `⚠️ Protein intake is quite high at ${Math.round(summary.proteinProgress)}%. Consider reducing portion sizes.`,
+        icon: '⚠️'
+      });
     } else if (summary.proteinProgress >= 90) {
       insights.push({
         type: 'success',
         message: `Excellent protein intake! You've reached ${Math.round(summary.proteinProgress)}% of your goal.`,
         icon: '💪'
+      });
+    }
+
+    // Fats insights
+    if (summary.fatsProgress > 110) {
+      insights.push({
+        type: 'warning',
+        message: `⚠️ Fat intake is quite high at ${Math.round(summary.fatsProgress)}%. Consider reducing oils and fatty foods.`,
+        icon: '🧈'
+      });
+    }
+
+    // Carbs insights
+    if (summary.carbsProgress > 110) {
+      insights.push({
+        type: 'warning',
+        message: `⚠️ Carb intake is quite high at ${Math.round(summary.carbsProgress)}%. Consider reducing starches and grains.`,
+        icon: '🍞'
       });
     }
 
@@ -405,8 +429,8 @@ export default function TrackPage() {
             message: `🚨 CRITICAL: ${Math.round(summary.totalSugars)}g sugar consumed! WHO limit is 50g/day.`,
             icon: '🚨'
           });
-        } else if (summary.sugarsProgress > 75) {
-          // Warning level (75-100%)
+        } else if (summary.sugarsProgress > 50) {
+          // Warning level (50-100%)
           insights.push({
             type: 'info',
             message: `⚠️ You're at ${Math.round(summary.sugarsProgress)}% of your daily sugar limit. Watch your sweet intake!`,
@@ -714,11 +738,13 @@ export default function TrackPage() {
         <View style={styles.calorieSummaryContainer}>
           <View style={styles.trackHeaderContainer}>
             <Text style={styles.calorieSummaryTitle}>🔥 Daily Calorie Intake</Text>
-            {userProfile?.bodyGoal && (
-              <View style={styles.bodyGoalBadge}>
-                <Text style={styles.bodyGoalBadgeText}>{userProfile.bodyGoal}</Text>
-              </View>
-            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {userProfile?.bodyGoal && (
+                <View style={styles.bodyGoalBadge}>
+                  <Text style={styles.bodyGoalBadgeText}>{userProfile.bodyGoal}</Text>
+                </View>
+              )}
+            </View>
           </View>
           {loadingNutritionData ? (
             <ActivityIndicator size="small" color="#4CAF50" />
@@ -761,18 +787,30 @@ export default function TrackPage() {
               <Text style={styles.nutritionMacroLabel}>Protein</Text>
               <Text style={styles.nutritionMacroValue}>{Math.round(dailySummary?.totalProtein || 0)}g</Text>
               <View style={styles.nutritionProgressBar}>
-                <View style={[styles.nutritionProgressFill, { width: `${dailySummary?.proteinProgress || 0}%`, backgroundColor: '#4CAF50' }]} />
+                <View style={[styles.nutritionProgressFill, { 
+                  width: `${Math.min(dailySummary?.proteinProgress || 0, 100)}%`, 
+                  backgroundColor: (dailySummary?.proteinProgress || 0) > 110 ? '#F44336' : '#4CAF50'
+                }]} />
               </View>
-              <Text style={styles.nutritionProgressText}>{Math.round(dailySummary?.proteinProgress || 0)}%</Text>
+              <Text style={[
+                styles.nutritionProgressText,
+                (dailySummary?.proteinProgress || 0) > 110 && { color: '#F44336', fontWeight: 'bold' }
+              ]}>{Math.round(dailySummary?.proteinProgress || 0)}%</Text>
             </View>
 
             <View style={styles.nutritionMacroCard}>
               <Text style={styles.nutritionMacroLabel}>Fats</Text>
               <Text style={styles.nutritionMacroValue}>{Math.round(dailySummary?.totalFats || 0)}g</Text>
               <View style={styles.nutritionProgressBar}>
-                <View style={[styles.nutritionProgressFill, { width: `${dailySummary?.fatsProgress || 0}%`, backgroundColor: '#FF9800' }]} />
+                <View style={[styles.nutritionProgressFill, { 
+                  width: `${Math.min(dailySummary?.fatsProgress || 0, 100)}%`, 
+                  backgroundColor: (dailySummary?.fatsProgress || 0) > 110 ? '#F44336' : '#FF9800'
+                }]} />
               </View>
-              <Text style={styles.nutritionProgressText}>{Math.round(dailySummary?.fatsProgress || 0)}%</Text>
+              <Text style={[
+                styles.nutritionProgressText,
+                (dailySummary?.fatsProgress || 0) > 110 && { color: '#F44336', fontWeight: 'bold' }
+              ]}>{Math.round(dailySummary?.fatsProgress || 0)}%</Text>
             </View>
           </View>
 
@@ -782,9 +820,15 @@ export default function TrackPage() {
               <Text style={styles.nutritionMacroLabel}>Carbs</Text>
               <Text style={styles.nutritionMacroValue}>{Math.round(dailySummary?.totalCarbs || 0)}g</Text>
               <View style={styles.nutritionProgressBar}>
-                <View style={[styles.nutritionProgressFill, { width: `${dailySummary?.carbsProgress || 0}%`, backgroundColor: '#2196F3' }]} />
+                <View style={[styles.nutritionProgressFill, { 
+                  width: `${Math.min(dailySummary?.carbsProgress || 0, 100)}%`, 
+                  backgroundColor: (dailySummary?.carbsProgress || 0) > 110 ? '#F44336' : '#2196F3'
+                }]} />
               </View>
-              <Text style={styles.nutritionProgressText}>{Math.round(dailySummary?.carbsProgress || 0)}%</Text>
+              <Text style={[
+                styles.nutritionProgressText,
+                (dailySummary?.carbsProgress || 0) > 110 && { color: '#F44336', fontWeight: 'bold' }
+              ]}>{Math.round(dailySummary?.carbsProgress || 0)}%</Text>
             </View>
 
             <View style={styles.nutritionMacroCard}>
@@ -792,11 +836,14 @@ export default function TrackPage() {
               <Text style={styles.nutritionMacroValue}>{Math.round(dailySummary?.totalSugars || 0)}g</Text>
               <View style={styles.nutritionProgressBar}>
                 <View style={[styles.nutritionProgressFill, { 
-                  width: `${dailySummary?.sugarsProgress || 0}%`, 
-                  backgroundColor: (dailySummary?.sugarsProgress || 0) > 75 ? '#F44336' : '#9C27B0' // Red if >75%, purple otherwise
+                  width: `${Math.min(dailySummary?.sugarsProgress || 0, 100)}%`, 
+                  backgroundColor: (dailySummary?.sugarsProgress || 0) > 50 ? '#F44336' : '#9C27B0'
                 }]} />
               </View>
-              <Text style={styles.nutritionProgressText}>{Math.round(dailySummary?.sugarsProgress || 0)}%</Text>
+              <Text style={[
+                styles.nutritionProgressText,
+                (dailySummary?.sugarsProgress || 0) > 50 && { color: '#F44336', fontWeight: 'bold' }
+              ]}>{Math.round(dailySummary?.sugarsProgress || 0)}%</Text>
             </View>
           </View>
         </View>
@@ -849,17 +896,19 @@ export default function TrackPage() {
                   <Text style={styles.loggedFoodMeal}>{food.meal}</Text>
                 </View>
                 <View style={styles.loggedFoodNutrition}>
-                  <Text style={styles.loggedFoodCalories}>{food.calories} kcal</Text>
-                  <View style={styles.loggedFoodMacros}>
+                  <View style={styles.loggedFoodCaloriesRow}>
+                    <Text style={styles.loggedFoodCalories}>{food.calories} kcal</Text>
+                  </View>
+                  <View style={styles.loggedFoodMacrosRow}>
                     <Text style={styles.loggedMacroText}>P: {food.protein}g</Text>
                     <Text style={styles.loggedMacroText}>F: {food.fats}g</Text>
                     <Text style={styles.loggedMacroText}>C: {food.carbs}g</Text>
                     <Text style={styles.loggedMacroText}>S: {food.sugars || 0}g</Text>
                   </View>
+                  <Text style={styles.loggedFoodDate}>
+                    Updated: {formatLoggedDate(food.loggedDate)}
+                  </Text>
                 </View>
-                <Text style={styles.loggedFoodDate}>
-                  Updated: {formatLoggedDate(food.loggedDate)}
-                </Text>
               </View>
             ));
           })()}
@@ -1441,6 +1490,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
+    paddingTop: 45, // Add more top padding for status bar
     marginBottom: 24,
     alignItems: 'center',
     elevation: 2,
@@ -1768,7 +1818,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F9FA",
     borderRadius: 8,
     padding: 12,
-    marginBottom: 8,
+    marginBottom: 12,
     borderLeftWidth: 4,
     borderLeftColor: "#4CAF50",
   },
@@ -1794,22 +1844,25 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   loggedFoodNutrition: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "column",
+    marginTop: 4,
+  },
+  loggedFoodCaloriesRow: {
     marginBottom: 4,
+  },
+  loggedFoodMacrosRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 6,
   },
   loggedFoodCalories: {
     fontSize: 14,
     fontWeight: "600",
     color: "#333",
   },
-  loggedFoodMacros: {
-    flexDirection: "row",
-    gap: 12,
-  },
   loggedMacroText: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#666",
     fontWeight: "500",
   },

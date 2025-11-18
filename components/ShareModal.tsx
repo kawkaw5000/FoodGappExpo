@@ -8,28 +8,33 @@ interface ShareModalProps {
   visible: boolean;
   onClose: () => void;
   shareData?: ShareData;
+  foodList?: any[]; // Add foodList prop to pass real data
 }
 
-const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
+const ShareModal = ({ visible, onClose, shareData, foodList: propsFoodList }: ShareModalProps) => {
   const [sharing, setSharing] = useState(false);
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
   const [foodList, setFoodList] = useState<any[]>([]);
   const previewRef = React.useRef(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
 
+  // Helper function to format numbers
+  const formatValue = (value: number): string => {
+    if (value % 1 === 0) return value.toString();
+    return value.toFixed(1);
+  };
+
   useEffect(() => {
     if (visible) {
       loadAvailablePlatforms();
-      // Load today's food logs (replace with your actual API or context)
-      // Example: fetch from AsyncStorage or API
-      // setFoodList([{ name: 'Adobo', calories: 285 }, ...]);
-      // For now, use placeholder
-      setFoodList([
-        { name: 'Adobo', calories: 285, protein: 25, carbs: 8, fats: 18 },
-        { name: 'Pancit Canton', calories: 340, protein: 12, carbs: 52, fats: 11 },
-      ]);
+      // Use real food data if provided, otherwise use empty array
+      if (propsFoodList && propsFoodList.length > 0) {
+        setFoodList(propsFoodList);
+      } else {
+        setFoodList([]);
+      }
     }
-  }, [visible]);
+  }, [visible, propsFoodList]);
 
   const loadAvailablePlatforms = async () => {
     const platforms = await SocialSharingService.getAvailablePlatforms();
@@ -53,18 +58,8 @@ const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
     setSharing(true);
     let success = false;
 
-    // Capture the preview card as an image
-    let uri: string | null = null;
     try {
-      if (previewRef.current) {
-        uri = await (previewRef.current as any).capture();
-        setImageUri(uri);
-      }
-    } catch (e) {
-      console.warn('ViewShot capture failed:', e);
-    }
-
-    try {
+      // Use text-only sharing for all platforms (no image capture)
       switch (platform) {
         case 'facebook':
           success = await SocialSharingService.shareToFacebook(data);
@@ -85,11 +80,7 @@ const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
           success = await SocialSharingService.copyToClipboard(data);
           break;
         case 'generic':
-          if (uri) {
-            success = await SocialSharingService.shareImageGeneric(uri);
-          } else {
-            success = await SocialSharingService.shareGeneric(data);
-          }
+          success = await SocialSharingService.shareGeneric(data);
           break;
         default:
           Alert.alert('Error', 'Platform not supported');
@@ -160,13 +151,13 @@ const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
               </View>
             </View>
             <View style={styles.macrosRow}>
-              <Text style={styles.macroText}>Protein {data.protein}g</Text>
-              <Text style={styles.macroText}>Fats {data.fats}g</Text>
-              <Text style={styles.macroText}>Carbs {data.carbs}g</Text>
+              <Text style={styles.macroText}>Protein {formatValue(data.protein)}g</Text>
+              <Text style={styles.macroText}>Fats {formatValue(data.fats)}g</Text>
+              <Text style={styles.macroText}>Carbs {formatValue(data.carbs)}g</Text>
             </View>
             {/* Food List Section */}
             <View style={{ marginTop: 15 }}>
-              <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>Foods Scanned/Logged Today:</Text>
+              <Text style={{ fontWeight: 'bold', fontSize: 14, marginBottom: 6 }}>Foods Scanned/Logged Today:</Text>
               {foodList.length > 0 ? (
                 foodList.map((food, idx) => (
                   <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -200,15 +191,9 @@ const ShareModal = ({ visible, onClose, shareData }: ShareModalProps) => {
                 >
                   <Ionicons 
                     name={config.icon as any} 
-                    size={40} 
+                    size={28} 
                     color={sharing ? '#ccc' : config.color} 
                   />
-                  <Text style={[
-                    styles.platformText,
-                    sharing && styles.platformTextDisabled
-                  ]}>
-                    {config.label}
-                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -256,22 +241,22 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   dateText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   userInfo: {
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   userNameText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
   },
   levelText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#FCB647',
     fontWeight: '500',
     marginTop: 2,
@@ -285,33 +270,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   summaryLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'gray',
   },
   macrosRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    marginTop: 10,
+    paddingHorizontal: 10,
   },
   macroText: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'gray',
+    textAlign: 'center',
   },
   platformsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
   },
   platformButton: {
     alignItems: 'center',
-    padding: 15,
-    margin: 10,
-    width: '30%',
+    justifyContent: 'center',
+    padding: 6,
+    margin: 5,
+    width: '28%',
     borderRadius: 10,
     backgroundColor: '#f5f5f5',
+    minHeight: 45,
   },
   platformButtonDisabled: {
     opacity: 0.5,

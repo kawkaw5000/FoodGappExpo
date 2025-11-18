@@ -98,6 +98,7 @@ export default function HomeScreen() {
   const [exerciseSuggestionsVisible, setExerciseSuggestionsVisible] = useState(false);
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
   const [userName, setUserName] = useState<string>('');
+  const [loggedFoods, setLoggedFoods] = useState<any[]>([]);
   
   // WellNū Study: Nutrition insights state
   const [nutritionInsights, setNutritionInsights] = useState<NutritionInsight[]>([]);
@@ -203,6 +204,7 @@ export default function HomeScreen() {
     useCallback(() => {
       loadUserLevel();
       loadUserData();
+      loadLoggedFoods();
       checkYesterdayGoal();
       checkYesterdayCalorieIntake();
     }, [])
@@ -244,6 +246,66 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error loading user data:', error);
       setUserName('');
+    }
+  };
+
+  // Load today's logged foods for sharing
+  const loadLoggedFoods = async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        const response = await fetch(`${Config.API_BASE}/api/foodlogging/getUserLogs?userId=${userId}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Home - Raw API response:", data);
+          
+          if (data.logs) {
+            // Transform all foods first
+            const allFoods = data.logs
+              .filter((log: any) => log.nutrientData) // Only include logs with nutrition data
+              .map((log: any) => {
+                // Transform to simple format for sharing
+                const foodName = log.foodData?.FoodName
+                  || log.foodName
+                  || log.nutrientData?.food?.FoodName
+                  || `Food Entry ${log.foodId}`;
+                
+                return {
+                  id: log.foodLogId.toString(),
+                  name: foodName,
+                  calories: Math.round(parseFloat(log.nutrientData.calories) || 0),
+                  protein: Math.round(parseFloat(log.nutrientData.protein) || 0),
+                  carbs: Math.round(parseFloat(log.nutrientData.carbs) || 0),
+                  fats: Math.round(parseFloat(log.nutrientData.fats) || 0),
+                  loggedDate: log.updatedAt || log.createdAt
+                };
+              });
+            
+            console.log("Home - All transformed foods:", allFoods);
+            
+            // For now, show the most recent 3 foods instead of filtering by today
+            // This will help us see if there's any food data at all
+            const recentFoods = allFoods
+              .sort((a: any, b: any) => new Date(b.loggedDate).getTime() - new Date(a.loggedDate).getTime())
+              .slice(0, 3);
+            
+            console.log("Home - Recent foods for sharing:", recentFoods);
+            setLoggedFoods(recentFoods);
+          } else {
+            console.log("Home - No logs found in response");
+            setLoggedFoods([]);
+          }
+        } else {
+          console.log("Home - API response not OK:", response.status);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading logged foods:', error);
     }
   };
 
@@ -913,6 +975,7 @@ export default function HomeScreen() {
         visible={shareModalVisible} 
         onClose={() => setShareModalVisible(false)} 
         shareData={getShareData()}
+        foodList={loggedFoods}
       />
 
       <ExerciseSuggestions 
@@ -981,6 +1044,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 15,
+    paddingTop: 45, // Add more top padding for status bar
     backgroundColor: 'white',
   },
   headerLeft: {

@@ -32,6 +32,17 @@ interface LoggedFood {
 
 // Food logging focused - nutrition tracking moved to Track tab
 
+// Helper function to format numerical values
+const formatValue = (value: any): string => {
+  const num = parseFloat(value) || 0;
+  // If it's a whole number, don't show decimals
+  if (num % 1 === 0) {
+    return num.toString();
+  }
+  // Otherwise show up to 2 decimals
+  return num.toFixed(2);
+};
+
 export default function LogPage() {
   const router = useRouter();
   const [loggedFoods, setLoggedFoods] = useState<LoggedFood[]>([]);
@@ -260,10 +271,10 @@ export default function LogPage() {
               </Text>
             </View>
             <View style={styles.macros}>
-              <Text style={styles.macroText}>P: {food.protein}g</Text>
-              <Text style={styles.macroText}>F: {food.fats}g</Text>
-              <Text style={styles.macroText}>C: {food.carbs}g</Text>
-              <Text style={styles.macroText}>S: {food.sugars || 0}g</Text>
+              <Text style={styles.macroText}>P: {formatValue(food.protein)}g</Text>
+              <Text style={styles.macroText}>F: {formatValue(food.fats)}g</Text>
+              <Text style={styles.macroText}>C: {formatValue(food.carbs)}g</Text>
+              <Text style={styles.macroText}>S: {formatValue(food.sugars || 0)}g</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -307,25 +318,25 @@ export default function LogPage() {
               </View>
               
               <View style={styles.caloriesSection}>
-                <Text style={styles.caloriesText}>{selectedFood?.calories || 0} cal</Text>
+                <Text style={styles.caloriesText}>{formatValue(selectedFood?.calories || 0)} cal</Text>
               </View>
               
               <View style={styles.macrosSection}>
                 <View style={styles.macroItem}>
                   <Text style={styles.macroLabel}>Protein</Text>
-                  <Text style={[styles.macroValue, {color: '#FF5722'}]}>{selectedFood?.protein || 0}g</Text>
+                  <Text style={[styles.macroValue, {color: '#FF5722'}]}>{formatValue(selectedFood?.protein || 0)}g</Text>
                 </View>
                 <View style={styles.macroItem}>
                   <Text style={styles.macroLabel}>Fats</Text>
-                  <Text style={[styles.macroValue, {color: '#FF9800'}]}>{selectedFood?.fats || 0}g</Text>
+                  <Text style={[styles.macroValue, {color: '#FF9800'}]}>{formatValue(selectedFood?.fats || 0)}g</Text>
                 </View>
                 <View style={styles.macroItem}>
                   <Text style={styles.macroLabel}>Carbs</Text>
-                  <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{selectedFood?.carbs || 0}g</Text>
+                  <Text style={[styles.macroValue, {color: '#4CAF50'}]}>{formatValue(selectedFood?.carbs || 0)}g</Text>
                 </View>
                 <View style={styles.macroItem}>
                   <Text style={styles.macroLabel}>Sugar</Text>
-                  <Text style={[styles.macroValue, {color: '#9C27B0'}]}>{selectedFood?.sugars || 0}g</Text>
+                  <Text style={[styles.macroValue, {color: '#9C27B0'}]}>{formatValue(selectedFood?.sugars || 0)}g</Text>
                 </View>
               </View>
               
